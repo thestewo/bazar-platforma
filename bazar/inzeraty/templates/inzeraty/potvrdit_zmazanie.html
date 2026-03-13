@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="mt-4">
+    <h2>Naozaj chcete zmazať inzerát "{{ inzerat.nazov }}"?</h2>
+    <p>Táto akcia je nevratná.</p>
+    
+    <form method="POST">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-danger">Áno, zmazať</button>
+        <a href="{% url 'detail_inzeratu' inzerat.pk %}" class="btn btn-secondary">Zrušiť</a>
+    </form>
+</div>
+{% endblock %}

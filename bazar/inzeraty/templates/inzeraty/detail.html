@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="mt-4 detail-container">
+    <h2>{{ inzerat.nazov }}</h2>
+
+    {% if inzerat.obrazok %}
+        <img src="{{ inzerat.obrazok.url }}" class="img-fluid" style="max-width: 500px;">
+    {% endif %}
+    <p><strong>Cena:</strong> {{ inzerat.cena }} €</p>
+    <p><strong>Popis:</strong> {{ inzerat.popis }}</p>
+
+    <p><small>Autor: {{ inzerat.autor.username }} | Pridané: {{ inzerat.vytvorene }}</small></p>
+    
+    
+    {% if user.is_authenticated and user == inzerat.autor %}
+        <a href="{% url 'upravit_inzerat' inzerat.pk %}" class="btn btn-warning">Upraviť inzerát</a>
+        <a href="{% url 'odstranit_inzerat' inzerat.pk %}" class="btn btn-danger">Zmazať inzerát</a>
+    {% endif %}
+    <a href="{% url 'home' %}" class="btn btn-secondary">Späť na zoznam</a>
+    
+</div>
+{% endblock %}

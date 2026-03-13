@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row mt-4 pb-5">
+    <div class="col-md-4">
+        <h3>Moje údaje</h3>
+        <form method="POST" class="card p-3 shadow-sm">
+            {% csrf_token %}
+            {{ u_form.as_p }}
+            {{ p_form.as_p }}
+            <button class="btn btn-primary w-100" type="submit">Uložiť zmeny</button>
+        </form>
+    </div>
+
+    <div class="col-md-8">
+        <h3>Moje inzeráty</h3>
+        <div class="row">
+            {% for inzerat in inzeraty %}
+                <div class="col-12 mb-2">
+                    <div class="card p-2 flex-row align-items-center justify-content-between">
+                        <div>
+                            <strong>{{ inzerat.nazov }}</strong> - {{ inzerat.cena }} €
+                        </div>
+                        <div>
+                            <a href="{% url 'detail_inzeratu' inzerat.pk %}" class="btn btn-sm btn-outline-info">Pozrieť</a>
+                            <a href="{% url 'upravit_inzerat' inzerat.pk %}" class="btn btn-sm btn-outline-warning">Upraviť</a>
+                        </div>
+                    </div>
+                </div>
+            {% empty %}
+                <p class="text-muted">Ešte ste nepridali žiadny inzerát.</p>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}
