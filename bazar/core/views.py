@@ -1,9 +1,6 @@
 from django.shortcuts import render
-from .models import TodoItem
+from inzeraty.models import Inzerat
 # Create your views here.
 def home(request):
-    return render(request, "home.html")
-
-def todos(request):
-    items = TodoItem.objects.all()
-    return render(request, "todos.html", {"todos": items})
+    inzeraty = Inzerat.objects.all().order_by('-vytvorene')
+    return render(request, 'home.html', {'inzeraty': inzeraty})

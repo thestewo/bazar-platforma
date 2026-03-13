@@ -1,4 +1,27 @@
-{% extends "base.html" %} {% block title %} Home Page {% endblock %}
+{% extends "base.html" %} {% block title %} GBST BAZÁR {% endblock %}
 {% block content %}
+<<<<<<< main
+<h2 class="mt-4">Najnovšie inzeráty</h2>
+<div class="row">
+    {% for inzerat in inzeraty %}
+    <div class="col-lg-3 col-md-4 col-sm-6 mb-4">
+        <div class="card h-100">
+            {% if inzerat.obrazok %}
+                <img src="{{ inzerat.obrazok.url }}" class="card-img-top" alt="{{ inzerat.nazov }}">
+            {% endif %}
+            <div class="card-body d-flex flex-column">
+                <h5 class="card-title text-truncate">{{ inzerat.nazov }}</h5>
+                <h6 class="card-subtitle mb-2 text-muted">{{ inzerat.cena }} €</h6>
+                <p class="card-text">{{ inzerat.popis|truncatewords:10 }}</p>
+                <a href="{% url 'detail_inzeratu' inzerat.pk %}" class="btn btn-primary btn-sm">Zobraziť viac</a>
+            </div>
+        </div>
+    </div>
+    {% empty %}
+    <p>Zatiaľ tu nie sú žiadne inzeráty.</p>
+    {% endfor %}
+</div>
+=======
 <p>Toto je domovská stránka also zec kar</p>
+>>>>>>> dev
 {% endblock %}

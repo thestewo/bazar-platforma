@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Pridať nový inzerát</h2>
+<form method="POST" enctype="multipart/form-data">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit" class="btn btn-success">Uložiť inzerát</button>
+</form>
+{% endblock %}
