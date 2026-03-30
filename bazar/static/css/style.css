@@ -73,3 +73,9 @@ padding-bottom: 50px;
     padding: 0;
     display: inline;
 }
+
+/* Skryť bodky v základe */
+.dropdown button { opacity: 100 !important; transition: opacity 0.2s; }
+
+/* Ukázať ich pri prejdení myšou nad správou */
+div.d-inline-block:hover .dropdown button { opacity: 0.6 !important; }

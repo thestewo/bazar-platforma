@@ -1,27 +1,45 @@
-{% extends "base.html" %} {% block title %} GBST BAZÁR {% endblock %}
+{% extends "base.html" %}
+
+{% block title %} GBST BAZÁR {% endblock %}
+
 {% block content %}
-<<<<<<< main
-<h2 class="mt-4">Najnovšie inzeráty</h2>
-<div class="row">
+<h2 class="mt-4 mb-4">Najnovšie inzeráty</h2>
+
+<div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 g-4">
     {% for inzerat in inzeraty %}
-    <div class="col-lg-3 col-md-4 col-sm-6 mb-4">
-        <div class="card h-100">
+    <div class="col">
+        <div class="card h-100 shadow-sm border-secondary bg-dark text-white d-flex flex-column">
+            
             {% if inzerat.obrazok %}
-                <img src="{{ inzerat.obrazok.url }}" class="card-img-top" alt="{{ inzerat.nazov }}">
+                <img src="{{ inzerat.obrazok.url }}" class="card-img-top" alt="{{ inzerat.nazov }}" 
+                     style="height: 300px; object-fit: cover;">
+            {% else %}
+                <div class="bg-secondary d-flex align-items-center justify-content-center" style="height: 300px;">
+                    <i class="bi bi-image text-white-50" style="font-size: 2rem;"></i>
+                </div>
             {% endif %}
+
             <div class="card-body d-flex flex-column">
-                <h5 class="card-title text-truncate">{{ inzerat.nazov }}</h5>
-                <h6 class="card-subtitle mb-2 text-muted">{{ inzerat.cena }} €</h6>
-                <p class="card-text">{{ inzerat.popis|truncatewords:10 }}</p>
-                <a href="{% url 'detail_inzeratu' inzerat.pk %}" class="btn btn-primary btn-sm">Zobraziť viac</a>
+                <h5 class="card-title text-truncate" title="{{ inzerat.nazov }}">{{ inzerat.nazov }}</h5>
+                <h6 class="card-subtitle mb-2 text-primary">{{ inzerat.cena }} €</h6>
+                
+                <p class="card-text small text-white-50">
+                    {{ inzerat.popis|truncatewords:10 }}
+                </p>
+
+                <div class="mt-auto">
+                    <a href="{% url 'detail_inzeratu' inzerat.pk %}" class="btn btn-primary w-100">
+                        Zobraziť viac
+                    </a>
+                </div>
             </div>
         </div>
     </div>
     {% empty %}
-    <p>Zatiaľ tu nie sú žiadne inzeráty.</p>
+    <div class="col-12">
+        <p class="text-center text-muted">Zatiaľ tu nie sú žiadne inzeráty.</p>
+    </div>
     {% endfor %}
 </div>
-=======
-<p>Toto je domovská stránka also zec kar</p>
->>>>>>> dev
+
 {% endblock %}

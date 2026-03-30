@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="mt-4 shadow p-4 card bg-dark text-white border-secondary">
+    <h3 class="mb-4">Moje konverzácie</h3>
+    <div class="list-group">
+        {% for chat in chaty %}
+            {% with posledna_sprava=chat.spravy.last %}
+            {# Zistíme, či má svietiť na modro: správa nie je od nás A je neprečítaná #}
+            {% if posledna_sprava and not posledna_sprava.precitane and posledna_sprava.odosielatel != user %}
+                <a href="{% url 'chat_detail' chat.inzerat.id %}" 
+                   class="list-group-item list-group-item-action bg-dark text-white border-primary mb-2 shadow" 
+                   style="border-left: 5px solid #0d6efd !important;">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong class="text-info">Inzerát: {{ chat.inzerat.nazov }}</strong><br>
+                            <small class="text-light opacity-75">
+                                S používateľom: {% if user == chat.kupujuci %}{{ chat.predajca.username }}{% else %}{{ chat.kupujuci.username }}{% endif %}
+                            </small>
+                            <div class="small mt-1 text-primary fw-bold">
+                                <i class="bi bi-envelope-fill me-1"></i> Nová správa
+                            </div>
+                        </div>
+                        <span class="badge bg-primary rounded-pill">!</span>
+                    </div>
+                </a>
+            {% else %}
+                {# Klasická prečítaná konverzácia #}
+                <a href="{% url 'chat_detail' chat.inzerat.id %}" 
+                   class="list-group-item list-group-item-action bg-dark text-white border-secondary mb-2 opacity-75">
+                    <strong>Inzerát: {{ chat.inzerat.nazov }}</strong><br>
+                    <small class="text-muted">
+                        S používateľom: {% if user == chat.kupujuci %}{{ chat.predajca.username }}{% else %}{{ chat.kupujuci.username }}{% endif %}
+                    </small>
+                </a>
+            {% endif %}
+            {% endwith %}
+        {% empty %}
+            <p class="text-muted text-center my-4">Nemáte žiadne správy.</p>
+        {% endfor %}
+    </div>
+</div>
+<script>
+    // Tento kód zistí, či sa používateľ vrátil na stránku cez tlačidlo "Späť"
+    window.addEventListener('pageshow', function(event) {
+        if (event.persisted || (typeof window.performance != 'undefined' && window.performance.navigation.type === 2)) {
+            // Ak áno, vynúti refresh stránky, aby zmizli modré notifikácie
+            window.location.reload();
+        }
+    });
+</script>
+{% endblock %}

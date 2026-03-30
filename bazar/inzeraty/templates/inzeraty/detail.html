@@ -1,23 +1,88 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="mt-4 detail-container">
-    <h2>{{ inzerat.nazov }}</h2>
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow p-4 bg-dark text-white border-secondary">
+                
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <h2 class="mb-0">{{ inzerat.nazov }}</h2>
+                    {% if not inzerat.je_aktivny %}
+                        <span class="badge bg-danger p-2">Uzavreté</span>
+                    {% else %}
+                        <span class="badge bg-success p-2">Aktívne</span>
+                    {% endif %}
+                </div>
 
-    {% if inzerat.obrazok %}
-        <img src="{{ inzerat.obrazok.url }}" class="img-fluid" style="max-width: 500px;">
-    {% endif %}
-    <p><strong>Cena:</strong> {{ inzerat.cena }} €</p>
-    <p><strong>Popis:</strong> {{ inzerat.popis }}</p>
+                <hr class="border-secondary">
 
-    <p><small>Autor: {{ inzerat.autor.username }} | Pridané: {{ inzerat.vytvorene }}</small></p>
-    
-    
-    {% if user.is_authenticated and user == inzerat.autor %}
-        <a href="{% url 'upravit_inzerat' inzerat.pk %}" class="btn btn-warning">Upraviť inzerát</a>
-        <a href="{% url 'odstranit_inzerat' inzerat.pk %}" class="btn btn-danger">Zmazať inzerát</a>
-    {% endif %}
-    <a href="{% url 'home' %}" class="btn btn-secondary">Späť na zoznam</a>
-    
+                {% if inzerat.obrazok %}
+                    <div class="text-center mb-4">
+                        <img src="{{ inzerat.obrazok.url }}" class="img-fluid rounded shadow" style="max-height: 500px; object-fit: contain;">
+                    </div>
+                {% else %}
+                    <div class="text-center mb-4 p-5 bg-secondary rounded">
+                        <i class="bi bi-image" style="font-size: 3rem; opacity: 0.3;"></i>
+                        <p class="text-white-50">Inzerát nemá obrázok</p>
+                    </div>
+                {% endif %}
+
+                <div class="mb-4">
+                    <h4 class="text-primary">{{ inzerat.cena }} €</h4>
+                    <p class="mt-3" style="white-space: pre-wrap;">{{ inzerat.popis }}</p>
+                </div>
+
+                <div class="p-3 bg-secondary bg-opacity-10 rounded mb-4 border border-secondary">
+                    <p class="mb-1">
+                        <strong>Predajca:</strong> 
+                        <a href="{% url 'verejny_profil' inzerat.autor.username %}" class="text-info text-decoration-none fw-bold">
+                            {{ inzerat.autor.username }}
+                        </a>
+                    </p>
+                    <p class="mb-0 text-white-50 small">
+                        <i class="bi bi-clock"></i> Pridané: {{ inzerat.vytvorene|date:"d. m. Y H:i" }}
+                    </p>
+                </div>
+
+                <div class="d-flex flex-wrap gap-2 pt-3 border-top border-secondary">
+                    
+                    <a href="{% url 'home' %}" class="btn btn-outline-light">
+                        <i class="bi bi-arrow-left"></i> Späť na zoznam
+                    </a>
+
+                    {% if user.is_authenticated and user == inzerat.autor %}
+                        <a href="{% url 'upravit_inzerat' inzerat.pk %}" class="btn btn-warning text-dark">
+                            <i class="bi bi-pencil-square"></i> Upraviť inzerát
+                        </a>
+                        
+                        <form action="{% url 'odstranit_inzerat' inzerat.pk %}" method="POST" class="d-inline" onsubmit="return confirm('Naozaj chcete tento inzerát natrvalo odstrániť?')">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-danger">
+                                <i class="bi bi-trash"></i> Zmazať inzerát
+                            </button>
+                        </form>
+                    {% endif %}
+
+                    {% if user.is_authenticated and user != inzerat.autor %}
+                        {% if inzerat.je_aktivny %}
+                            <a href="{% url 'zacat_chat' inzerat.id %}" class="btn btn-success px-4">
+                                <i class="bi bi-chat-dots"></i> Odpovedať na inzerát
+                            </a>
+                        {% else %}
+                            <button class="btn btn-secondary" disabled>Inzerát už nie je dostupný</button>
+                        {% endif %}
+                    {% endif %}
+
+                    {% if not user.is_authenticated %}
+                        <a href="{% url 'login' %}" class="btn btn-outline-primary">
+                            Prihláste sa pre kontaktovanie predajcu
+                        </a>
+                    {% endif %}
+                </div>
+
+            </div>
+        </div>
+    </div>
 </div>
 {% endblock %}
