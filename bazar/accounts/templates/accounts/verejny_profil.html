@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row mt-4 pb-5">
+    <div class="col-md-4">
+        <div class="card p-4 shadow-sm">
+            <h3>{{ predajca.username }}</h3>
+            <hr>
+
+            {% if predajca.first_name %}
+            <p><strong>Meno:</strong> {{ predajca.first_name }}</p>
+            {% endif %}
+
+            {% if predajca.last_name %}
+            <p><strong>Priezvisko:</strong> {{ predajca.last_name }}</p>
+            {% endif %}
+
+            {% if predajca.profile.telefon %}
+                <p><strong>Telefón:</strong> {{ predajca.profile.telefon }}</p>
+            {% endif %}
+            
+            {% if predajca.profile.mesto %}
+                <p><strong>Mesto:</strong> {{ predajca.profile.mesto }}</p>
+            {% endif %}
+
+            {% if predajca.email %}
+            <p><strong>Email:</strong> <a href="mailto:{{ predajca.email }}">{{ predajca.email }}</a></p>
+            {% endif %}
+
+        </div>
+    </div>
+
+    <div class="col-md-8">
+        <h4>Inzeráty od tohto predajcu</h4>
+        <div class="row">
+            {% for inzerat in inzeraty %}
+                <div class="col-md-6 mb-3">
+                    <div class="card h-100 shadow-sm">
+                        <div class="card-body">
+                            <h5 class="card-title">{{ inzerat.nazov }}</h5>
+                            <p class="price-tag">{{ inzerat.cena }} €</p>
+                            <a href="{% url 'detail_inzeratu' inzerat.pk %}" class="btn btn-outline-primary btn-sm w-100">Pozrieť</a>
+                        </div>
+                    </div>
+                </div>
+            {% empty %}
+                <p class="text-muted">Tento používateľ momentálne nemá žiadne inzeráty.</p>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}

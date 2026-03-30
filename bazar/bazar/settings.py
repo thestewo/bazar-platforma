@@ -61,8 +61,8 @@ DATABASES = {
         'ENGINE': 'django.db.backends.mysql',
         'NAME': 'bazar',
         'USER': 'root',
-        'PASSWORD': 'maleksmrdi123',
-        'HOST': 'localhost',
+        'PASSWORD': 'Maleksmrdi123',
+        'HOST': '127.0.0.1',
         'PORT': '3306',
     }
 }
@@ -91,7 +91,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'Europe/Bratislava'
 
 USE_I18N = True
 

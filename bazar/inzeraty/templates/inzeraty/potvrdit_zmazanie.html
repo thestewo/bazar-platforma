@@ -1,14 +1,26 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="mt-4">
-    <h2>Naozaj chcete zmazať inzerát "{{ inzerat.nazov }}"?</h2>
-    <p>Táto akcia je nevratná.</p>
-    
-    <form method="POST">
-        {% csrf_token %}
-        <button type="submit" class="btn btn-danger">Áno, zmazať</button>
-        <a href="{% url 'detail_inzeratu' inzerat.pk %}" class="btn btn-secondary">Zrušiť</a>
-    </form>
+<div class="container mt-5">
+    <div class="card border-danger shadow-sm mx-auto" style="max-width: 600px;">
+        <div class="card-header bg-danger text-white">
+            <h4 class="mb-0">Potvrdenie o uzavretí inzerátu</h4>
+        </div>
+        <div class="card-body py-4 text-center">
+            <h5 class="card-title">Chcete stiahnuť inzerát <strong>"{{ inzerat.nazov }}"</strong> z ponuky?</h5>
+            <p class="card-text text-muted">
+                Inzerát už nebude viditeľný pre ostatných používateľov. <br>
+                História vašich doterajších konverzácií k tomuto inzerátu zostane zachovaná.
+            </p>
+            
+            <hr>
+
+            <form method="POST" class="d-inline">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-danger px-4">Áno, uzavrieť inzerát</button>
+            </form>
+            <a href="{% url 'detail_inzeratu' inzerat.pk %}" class="btn btn-outline-secondary px-4 ms-2">Zrušiť</a>
+        </div>
+    </div>
 </div>
 {% endblock %}

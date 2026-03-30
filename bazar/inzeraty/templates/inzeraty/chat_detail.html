@@ -1,0 +1,245 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div id="django-data" 
+     data-konverzacia-id="{{ konverzacia.id|default:'' }}"
+     data-inzerat-id="{{ inzerat.id }}"
+     data-je-aktivny="{{ inzerat.je_aktivny|yesno:'true,false' }}"
+     style="display: none;">
+</div>
+
+<div class="mt-4 card p-4 shadow bg-dark text-white border-secondary">
+    <div class="alert alert-info d-flex justify-content-between align-items-center bg-info text-dark border-0">
+        <div>
+            Chat k inzerátu: <strong>{{ inzerat.nazov }}</strong> ({{ inzerat.cena }} €)
+        </div>
+        {% if inzerat.je_aktivny %}
+            <span class="badge bg-success text-white">Aktívne</span>
+        {% else %}
+            <span class="badge bg-danger text-white">Uzavreté</span>
+        {% endif %}
+    </div>
+
+    {% if not inzerat.je_aktivny %}
+        <div class="alert alert-warning text-center border-warning bg-transparent text-warning">
+            <i class="bi bi-exclamation-triangle-fill"></i>
+            <strong>Tento inzerát bol predajcom uzavretý.</strong> 
+            Nové správy už nie je možné odosielať.
+        </div>
+    {% endif %}
+
+    <div class="chat-box mb-3 p-3 border border-secondary rounded bg-dark" style="height: 450px; overflow-y: auto; display: flex; flex-direction: column;">
+        {% if spravy %}
+            {% include 'inzeraty/chat_messages_partial.html' %}
+        {% else %}
+            <p class="text-center text-muted mt-5">Zatiaľ žiadne správy. Napíš prvú správu nižšie.</p>
+        {% endif %}
+    </div>
+
+    {% if inzerat.je_aktivny %}
+    <div id="image-preview-wrapper" class="mb-2 d-none" style="position: relative; width: fit-content;">
+        <img id="image-preview-img" src="" class="img-thumbnail" style="max-height: 120px; background: #444;">
+        <button type="button" id="cancel-image" class="btn btn-danger btn-sm" style="position: absolute; top: -5px; right: -5px; border-radius: 50%; padding: 0 6px;">&times;</button>
+    </div>
+
+    <form id="chat-form" method="POST" action="{% url 'poslat_spravu' inzerat.id %}" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="input-group shadow-sm">
+            <input type="text" name="text" id="chat-input" class="form-control bg-secondary text-white border-0" placeholder="Napíš správu...">
+            
+            <label class="btn btn-outline-light mb-0 d-flex align-items-center" for="image-input" style="cursor: pointer;">
+                <i class="bi bi-image"></i>
+            </label>
+            <input type="file" name="obrazok" id="image-input" style="display: none;" accept="image/*">
+            
+            <button type="submit" class="btn btn-primary px-4 fw-bold">Odoslať</button>
+        </div>
+    </form>
+    {% endif %}
+</div>
+
+<div class="modal fade" id="editModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content bg-dark text-white border-secondary shadow-lg">
+            <form id="editForm" method="POST" action="">
+                {% csrf_token %}
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title">Upraviť správu</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <textarea name="text" id="editTextarea" class="form-control bg-secondary text-white border-0" rows="3"></textarea>
+                    <small class="text-muted mt-1 d-block">Poznámka: Upravujete len textovú časť správy.</small>
+                </div>
+                <div class="modal-footer border-secondary">
+                    <button type="button" class="btn btn-outline-light" data-bs-dismiss="modal">Zrušiť</button>
+                    <button type="submit" class="btn btn-primary">Uložiť zmeny</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    // 1. ZÍSKANIE DÁT
+    const djangoData = document.getElementById('django-data').dataset;
+    const konverzaciaId = djangoData.konverzaciaId;
+    const inzeratId = djangoData.inzeratId;
+    
+    const imgInput = document.getElementById('image-input');
+    const previewWrapper = document.getElementById('image-preview-wrapper');
+    const previewImg = document.getElementById('image-preview-img');
+    const cancelImgBtn = document.getElementById('cancel-image');
+    const chatInputField = document.getElementById('chat-input');
+
+    // 2. NÁHĽAD OBRÁZKA
+    if (imgInput) {
+        imgInput.addEventListener('change', function() {
+            const file = this.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    previewImg.src = e.target.result;
+                    previewWrapper.classList.remove('d-none');
+                }
+                reader.readAsDataURL(file);
+            }
+        });
+    }
+
+    if (cancelImgBtn) {
+        cancelImgBtn.addEventListener('click', function() {
+            imgInput.value = "";
+            previewWrapper.classList.add('d-none');
+        });
+    }
+
+    // 3. ODOSIELANIE NOVEJ SPRÁVY (AJAX)
+    const hlavnyChatForm = document.getElementById('chat-form');
+    if (hlavnyChatForm) {
+        hlavnyChatForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const hasText = chatInputField.value.trim().length > 0;
+            const hasImage = imgInput.files.length > 0;
+
+            if (!hasText && !hasImage) return;
+
+            const formData = new FormData(this);
+
+            fetch(this.action, {
+                method: 'POST',
+                body: formData,
+                headers: { 
+                    'X-CSRFToken': '{{ csrf_token }}',
+                    'X-Requested-With': 'XMLHttpRequest' 
+                }
+            })
+            .then(response => {
+                if (response.ok) {
+                    this.reset();
+                    previewWrapper.classList.add('d-none');
+                    if (!konverzaciaId || konverzaciaId === "") {
+                        window.location.reload(); 
+                    } else {
+                        nacitajNoveSpravy();
+                    }
+                } else {
+                    alert("Chyba 500: Server správu nespracoval. Skontroluj views.py a Media nastavenia.");
+                }
+            });
+        });
+    }
+
+    // 4. AUTOMATICKÉ NAČÍTANIE SPRÁV
+    function nacitajNoveSpravy() {
+    if (!konverzaciaId || document.querySelector('.dropdown-menu.show')) return;
+    
+    fetch("/inzeraty/chat/" + konverzaciaId + "/nacitat/")
+        .then(response => response.text())
+        .then(html => {
+            const chatBox = document.querySelector('.chat-box');
+            
+            if (html.trim() !== "" && chatBox.innerHTML.trim() !== html.trim()) {
+                // Zistíme, či je používateľ na spodku (s rezervou 50px)
+                const isAtBottom = chatBox.scrollHeight - chatBox.clientHeight <= chatBox.scrollTop + 50;
+
+                chatBox.innerHTML = html;
+
+                // Scrollneme dole IBA ak bol používateľ na spodku predtým
+                if (isAtBottom) {
+                    chatBox.scrollTop = chatBox.scrollHeight;
+                }
+            }
+        });
+        }
+    setInterval(nacitajNoveSpravy, 3000);
+
+    // 5. MAZANIE SPRÁVY
+    function zmazatSpravu(event, id) {
+    event.preventDefault();
+    
+    // 1. Nájdeme element správy v HTML
+    const riadokSpravy = event.target.closest('.mb-3');
+    
+    if (riadokSpravy) {
+        // 2. OKAMŽITE ju odstránime z obrazovky (používateľ nečaká na server)
+        riadokSpravy.style.transition = "opacity 0.2s ease"; // Voliteľný pekný efekt
+        riadokSpravy.style.opacity = "0";
+        
+        // Po krátkej animácii ju vymažeme z kódu úplne
+        setTimeout(() => {
+            riadokSpravy.remove();
+        }, 200);
+
+        // 3. Pošleme požiadavku na server, aby sa zmazala v databáze
+        fetch("/inzeraty/chat/sprava/zmazat/" + id + "/", {
+            method: 'POST',
+            headers: { 
+                'X-CSRFToken': '{{ csrf_token }}',
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        }).then(res => {
+            if (res.ok) {
+                // Poistka: hneď načítame čerstvé dáta zo servera
+                nacitajNoveSpravy();
+            } else {
+                // Ak by náhodou server zlyhal, vrátime správu späť (refresh stránky)
+                console.error("Nepodarilo sa zmazať správu na serveri.");
+                window.location.reload();
+            }
+        }).catch(err => {
+            console.error("Chyba siete:", err);
+            window.location.reload();
+        });
+    }
+}
+
+    // 6. EDITÁCIA SPRÁVY
+    function otvorEdit(id, povodnyText) {
+        document.getElementById('editTextarea').value = povodnyText;
+        document.getElementById('editForm').action = "/inzeraty/sprava/upravit/" + id + "/";
+        new bootstrap.Modal(document.getElementById('editModal')).show();
+    }
+
+    const editForm = document.getElementById('editForm');
+    if (editForm) {
+        editForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            fetch(this.action, { 
+                method: 'POST',
+                body: new FormData(this),
+                headers: {
+                    'X-CSRFToken': '{{ csrf_token }}',
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            }).then(res => {
+                if (res.ok) {
+                    bootstrap.Modal.getInstance(document.getElementById('editModal')).hide();
+                    nacitajNoveSpravy();
+                }
+            });
+        });
+    }
+</script>
+{% endblock %}
