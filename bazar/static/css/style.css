@@ -74,8 +74,38 @@ padding-bottom: 50px;
     display: inline;
 }
 
-/* Skryť bodky v základe */
+/* Kontajner pre obrázok v detaile - TOTO JE OPRAVA PRETEKANIA */
+.detail-img-container {
+    width: 100%;
+    /* Nastavíme pevnú výšku pre celý blok (obrázok aj info panel napravo) */
+    height: 550px; 
+    /* Ak chceš blok vyšší alebo nižší, zmeň túto hodnotu (napr. 600px alebo 500px) */
+    
+    background-color: #2c2f33; /* Tmavosivá farba pozadia, ktorú sme si dohodli */
+    border-radius: 0; /* V detaile je lepšie mať 0, aby to ladilo s 'row g-0' */
+    overflow: hidden;
+    display: flex;
+    align-items: center; /* Vertikálne vycentrovanie fotky */
+    justify-content: center; /* Horizontálne vycentrovanie fotky */
+}
+
+/* Samotný obrázok - prispôsobí sa kontajneru */
+.detail-img-container img {
+    max-width: 100%; /* Nikdy nepresiahne šírku stĺpca */
+    max-height: 100%; /* Nikdy nepresiahne nastavených 550px */
+    object-fit: contain; /* Zmenší sa, ale NIKDY sa neořeže. Uvidíš celú fotku. */
+    display: block;
+}
+
+/* Responzivita pre mobily */
+@media (max-width: 768px) {
+    .detail-img-container {
+        height: auto; /* Na mobile sa výška prispôsobí obsahu */
+        min-height: 300px; /* Ale udrží si aspoň minimálnu výšku */
+    }
+}
+
 .dropdown button { opacity: 100 !important; transition: opacity 0.2s; }
 
-/* Ukázať ich pri prejdení myšou nad správou */
+
 div.d-inline-block:hover .dropdown button { opacity: 0.6 !important; }

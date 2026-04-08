@@ -3,8 +3,80 @@
 {% block title %} GBST BAZÁR {% endblock %}
 
 {% block content %}
-<h2 class="mt-4 mb-4">Najnovšie inzeráty</h2>
 
+<div class="card bg-dark border-secondary shadow-lg mb-5" style="border-radius: 15px; overflow: hidden;">
+    <div class="card-body p-4">
+        <form method="GET" action="{% url 'home' %}" class="row g-3 align-items-end">
+            
+            <!-- Typ inzerátu ako prepínacie tlačidlá -->
+            <div class="col-lg-3 col-md-12">
+                <label class="form-label text-white-50 small d-block">Typ inzerátu</label>
+                <div class="btn-group w-100" role="group" aria-label="Typ inzerátu">
+                    <input type="radio" class="btn-check" name="typ" id="typ_vsetky" value="" 
+                        {% if not request.GET.typ %}checked{% endif %} onchange="this.form.submit()">
+                    <label class="btn btn-outline-secondary" for="typ_vsetky">Všetky</label>
+
+                    {% for t in typy %}
+                    <input type="radio" class="btn-check" name="typ" id="typ_{{ t.id }}" value="{{ t.id }}" 
+                        {% if request.GET.typ == t.id|stringformat:"i" %}checked{% endif %} onchange="this.form.submit()">
+                    <label class="btn btn-outline-secondary" for="typ_{{ t.id }}">{{ t.nazov }}</label>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Vyhľadávacie pole -->
+            <div class="col-lg-3 col-md-6">
+                <label class="form-label text-white-50 small">Kľúčové slovo</label>
+                <div class="input-group">
+                    <span class="input-group-text bg-dark border-secondary text-white-50"><i class="bi bi-search"></i></span>
+                    <input type="text" name="q" class="form-control bg-dark text-white border-secondary" 
+                        placeholder="Hľadať..." value="{{ request.GET.q|default:'' }}">
+                </div>
+            </div>
+
+            <!-- Kategória -->
+            <div class="col-lg-2 col-md-6">
+                <label class="form-label text-white-50 small">Kategória</label>
+                <select name="kategoria" class="form-select bg-dark text-white border-secondary">
+                    <option value="">Všetky</option>
+                    {% for kat in kategorie %}
+                        <option value="{{ kat.id }}" {% if request.GET.kategoria == kat.id|stringformat:"i" %}selected{% endif %}>
+                            {{ kat.nazov }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Cena -->
+            <div class="col-lg-3 col-md-8">
+                <label class="form-label text-white-50 small">Cena (€)</label>
+                <div class="input-group">
+                    <input type="number" name="min_cena" class="form-control bg-dark text-white border-secondary" 
+                        placeholder="Od" value="{{ request.GET.min_cena }}">
+                    <input type="number" name="max_cena" class="form-control bg-dark text-white border-secondary" 
+                        placeholder="Do" value="{{ request.GET.max_cena }}">
+                </div>
+            </div>
+
+            <!-- Submit Button -->
+            <div class="col-lg-1 col-md-4 d-grid">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-funnel-fill"></i>
+                </button>
+            </div>
+        </form>
+
+        {% if request.GET.q or request.GET.kategoria or request.GET.min_cena or request.GET.max_cena or request.GET.typ %}
+            <div class="mt-3 text-center">
+                <a href="{% url 'home' %}" class="btn btn-outline-warning btn-sm border-0">
+                    <i class="bi bi-x-circle"></i> Zrušiť všetky filtre
+                </a>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<h2 class="mt-4 mb-4">Najnovšie inzeráty</h2>
 <div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 g-4">
     {% for inzerat in inzeraty %}
     <div class="col">
@@ -21,8 +93,16 @@
 
             <div class="card-body d-flex flex-column">
                 <h5 class="card-title text-truncate" title="{{ inzerat.nazov }}">{{ inzerat.nazov }}</h5>
-                <h6 class="card-subtitle mb-2 text-primary">{{ inzerat.cena }} €</h6>
+                <h6 class="card-subtitle mb-2 text-primary fw-bold">{{ inzerat.cena }} €</h6>
                 
+                <!-- PRIDANÉ: Kategória a Typ -->
+                <div class="mb-2">
+                    <span class="badge bg-secondary small">{{ inzerat.kategoria.nazov }}</span>
+                    <span class="badge {% if inzerat.typ.nazov == 'Predaj' %}bg-info text-dark{% else %}bg-warning text-dark{% endif %} small">
+                        {{ inzerat.typ.nazov }}
+                    </span>
+                </div>
+
                 <p class="card-text small text-white-50">
                     {{ inzerat.popis|truncatewords:10 }}
                 </p>
