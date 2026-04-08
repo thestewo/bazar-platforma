@@ -47,6 +47,8 @@ def upravit_inzerat(request, pk):
         
     return render(request, 'inzeraty/pridat_inzerat.html', {'form': form, 'inzerat': inzerat})
 
+
+@login_required
 def odstranit_inzerat(request, pk):
     inzerat = get_object_or_404(Inzerat, pk=pk)
 
@@ -69,7 +71,6 @@ def zacat_chat(request, inzerat_id):
     if inzerat.autor == request.user:
         return redirect('detail_inzeratu', pk=inzerat.id) 
 
-    
     konverzacia, created = Konverzacia.objects.get_or_create(
         inzerat=inzerat,
         kupujuci=request.user,
