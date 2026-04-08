@@ -1,22 +1,63 @@
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from .forms import RegisterForm, UserUpdateForm, ProfileUpdateForm
-from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
 from inzeraty.models import Inzerat
-from django.shortcuts import render, get_object_or_404
 from django.contrib.auth.models import User
+from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
+from django.utils.encoding import force_bytes, force_str
+from django.contrib.auth.tokens import default_token_generator
+from django.core.mail import send_mail
+from django.contrib import messages
+from django.contrib.auth import views as auth_views
+
+
+class MyLoginView(auth_views.LoginView):
+    def form_valid(self, form):
+        messages.success(self.request, f"Vitajte späť, {form.get_user().username}!")
+        return super().form_valid(form)
+
 
 def register_view(request):
     if request.method == 'POST':
         form = RegisterForm(request.POST)
         if form.is_valid():
-            user = form.save()
-            login(request, user) # Automaticky prihlási používateľa po registrácii
-            return redirect('home') # Presmeruje na domovskú stránku
+            user = form.save(commit=False)
+            user.is_active = False  # Používateľ sa ešte nemôže prihlásiť
+            user.save()
+
+            # --- Logika pre overovací mail ---
+            token = default_token_generator.make_token(user)
+            uid = urlsafe_base64_encode(force_bytes(user.pk))
+            domain = request.get_host()
+            link = f"http://{domain}/accounts/activate/{uid}/{token}/"
+            
+            subject = 'Aktivujte svoj účet'
+            message = f'Ahoj {user.username}, klikni na tento link pre aktiváciu účtu: {link}'
+            
+            send_mail(subject, message, 'noreply@tvojweb.sk', [user.email])
+            # ---------------------------------
+
+            messages.info(request, 'Registrácia úspešná. Skontroluj si e-mail pre aktiváciu účtu.')
+            return redirect('login') # Presmerujeme na login, kde mu vypíše správu
     else:
         form = RegisterForm()
     
     return render(request, 'accounts/register.html', {'form': form})
+
+def activate(request, uidb64, token):
+    try:
+        uid = force_str(urlsafe_base64_decode(uidb64))
+        user = User.objects.get(pk=uid)
+    except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+        user = None
+
+    if user is not None and default_token_generator.check_token(user, token):
+        user.is_active = True
+        user.save()
+        messages.success(request, 'Váš účet bol úspešne aktivovaný! Teraz sa môžete prihlásiť.')
+        return redirect('login')
+    else:
+        return render(request, 'accounts/activation_invalid.html')
 
 @login_required
 def profil(request):

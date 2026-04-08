@@ -11,6 +11,7 @@ DEBUG = True
 
 ALLOWED_HOSTS = []
 
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 
 # Application definition
 
@@ -61,7 +62,7 @@ DATABASES = {
         'ENGINE': 'django.db.backends.mysql',
         'NAME': 'bazar',
         'USER': 'root',
-        'PASSWORD': 'Maleksmrdi123',
+        'PASSWORD': 'maleksmrdi123',
         'HOST': '127.0.0.1',
         'PORT': '3306',
     }
