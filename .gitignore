@@ -1,0 +1,12 @@
+__pycache__/
+*.py[cod]
+*$py.class
+db.sqlite3
+venv/
+env/
+media/
+MC.mp3
+nieco.html
+.vscode/
+.idea/
+.env
