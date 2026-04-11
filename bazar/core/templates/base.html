@@ -1,13 +1,12 @@
 {% load static %} <!DOCTYPE html>
-<html lang="sk">
+<html lang="sk" data-bs-theme="dark">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>{% block title %}GBST BAZÁR{% endblock %}</title>
+    <link rel="icon" type="image/png" href="{% static 'favicon.png' %}">
 <!--<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css"  rel="stylesheet" />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">  
-        
-    
     -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="{% static 'css/style.css' %}">
@@ -53,26 +52,16 @@
                 <a class="btn btn-primary ms-lg-3" href="{% url 'register' %}">Registrácia</a>
               </li>
             {% endif %}
-
-              <button class="btn btn-outline-secondary btn-sm" id="btn-theme" onclick="toggleTheme()">
-                  🌓
-              </button>
-
-              <script>
-                  function toggleTheme() {
-                      const html = document.documentElement;
-                      const currentTheme = html.getAttribute('data-bs-theme');
-                      const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-                      html.setAttribute('data-bs-theme', newTheme);
-                      localStorage.setItem('theme', newTheme);
-                  }
-
-                  // Načítanie uloženej témy pri štarte
-                  const savedTheme = localStorage.getItem('theme') || 'light';
-                  document.documentElement.setAttribute('data-bs-theme', savedTheme);
-              </script>
+              <li class="nav-item ms-lg-3">
+                <button id="music-toggle" class="btn btn-outline-secondary btn-sm d-flex align-items-center justify-content-center" 
+                        style="border-radius: 50%; width: 35px; height: 35px; padding: 0;">
+                    <i id="music-icon" class="bi bi-volume-mute"></i>
+                </button>
+              </li>
           </ul>
-
+          <audio id="bg-music" loop>
+            <source src="{% static 'audio/MC.mp3' %}" type="audio/mpeg">
+          </audio>
         </div>
       </div>
     </nav>
@@ -88,7 +77,78 @@
       {% block content %} {% endblock %}
 
     </div>
+
+
+
+    <footer class="py-4 mt-auto border-top border-secondary">
+    <div class="container text-center text-muted">
+        <p class="mb-0">
+            &copy; <span id="current-year"></span> Jakub Dzúr a Richard Mágyel. Všetky práva vyhradené.
+        </p>
+        <small>GBST BAZÁR</small>
+    </div>
+    </footer>
+
+    <script>
+        // Automaticky nastaví aktuálny rok
+        document.getElementById('current-year').textContent = new Date().getFullYear();
+    </script>
+
+
+
+
+
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+      const music = document.getElementById('bg-music');
+      const btn = document.getElementById('music-toggle');
+      const icon = document.getElementById('music-icon');
+
+      // Hlasitosť na 15% (príjemný podmaz)
+      music.volume = 1; 
+
+      function updateIcon(isPlaying) {
+          if (isPlaying) {
+              icon.classList.replace('bi-volume-mute', 'bi-volume-up');
+              btn.classList.add('text-primary', 'border-primary'); // Zmení farbu na modrú, keď hrá
+          } else {
+              icon.classList.replace('bi-volume-up', 'bi-volume-mute');
+              btn.classList.remove('text-primary', 'border-primary');
+          }
+      }
+
+      function toggleMusic() {
+          if (music.paused) {
+              music.play();
+              localStorage.setItem('musicStatus', 'playing');
+              updateIcon(true);
+          } else {
+              music.pause();
+              localStorage.setItem('musicStatus', 'paused');
+              updateIcon(false);
+          }
+      }
+
+      btn.addEventListener('click', toggleMusic);
+      window.addEventListener('click', () => {
+          if (localStorage.getItem('musicStatus') !== 'paused' && music.paused) {
+              music.play().then(() => {
+                  updateIcon(true);
+              }).catch(e => console.log("Autoplay blokovaný"));
+          }
+      }, { once: true });
+
+      if (localStorage.getItem('musicStatus') === 'playing') {
+          updateIcon(true);
+      }
+    </script>
+
+
+
+
+
+
   </body>
 </html>
  

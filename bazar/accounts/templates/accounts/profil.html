@@ -3,7 +3,7 @@
 <div class="row mt-4 pb-5">
     <div class="col-md-4">
         <h3>Moje údaje</h3>
-        <form method="POST" class="card p-3 shadow-sm">
+        <form method="POST" class="card bg-dark p-3 shadow-sm">
             {% csrf_token %}
             {{ u_form.as_p }}
             {{ p_form.as_p }}
@@ -16,7 +16,7 @@
         <div class="row">
             {% for inzerat in inzeraty %}
                 <div class="col-12 mb-2">
-                    <div class="card p-2 flex-row align-items-center justify-content-between">
+                    <div class="card bg-dark p-2 flex-row align-items-center justify-content-between">
                         <div>
                             <strong>{{ inzerat.nazov }}</strong> - {{ inzerat.cena }} €
                         </div>

@@ -3,12 +3,50 @@
 {% block title %}Registrácia{% endblock %}
 
 {% block content %}
-<div class="mt-4">
-    <h2>Vytvoriť účet</h2>
-    <form method="POST">
-        {% csrf_token %}
-        {{ form.as_p }}
-        <button type="submit" class="btn btn-primary">Zaregistrovať sa</button>
-    </form>
+<div class="row justify-content-center mt-5">
+    <div class="col-md-6 col-lg-5">
+        <div class="card shadow-sm p-4">
+            <h2 class="text-center mb-4">Vytvoriť účet</h2>
+            
+            <form method="POST" novalidate>
+                {% csrf_token %}
+
+                {% if form.non_field_errors %}
+                    {% for error in form.non_field_errors %}
+                        <div class="alert alert-danger">{{ error }}</div>
+                    {% endfor %}
+                {% endif %}
+
+                {% for field in form %}
+                    <div class="mb-3">
+                        <label class="form-label font-weight-bold">{{ field.label }}</label>
+                        {{ field }}
+                        
+                        {% if field.help_text %}
+                            <small class="form-text text-muted d-block mt-1">
+                                {{ field.help_text }}
+                            </small>
+                        {% endif %}
+
+                        {% if field.errors %}
+                            {% for error in field.errors %}
+                                <div class="text-danger small mt-1">{{ error }}</div>
+                            {% endfor %}
+                        {% endif %}
+                    </div>
+                {% endfor %}
+
+                <div class="d-grid gap-2 mt-4">
+                    <button type="submit" class="btn btn-success btn-lg">Zaregistrovať sa</button>
+                </div>
+            </form>
+            
+            <hr class="my-4 border-secondary">
+            
+            <p class="text-center mb-0">
+                Už máte účet? <a href="{% url 'login' %}" class="text-primary text-decoration-none fw-bold">Prihláste sa</a>
+            </p>
+        </div>
+    </div>
 </div>
 {% endblock %}

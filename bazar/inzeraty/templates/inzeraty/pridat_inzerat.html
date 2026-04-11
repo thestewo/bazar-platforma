@@ -1,9 +1,87 @@
 {% extends "base.html" %}
+{% load static %}
+
+{% block title %}Pridať inzerát | GBST BAZÁR{% endblock %}
+
 {% block content %}
-<h2>Pridať nový inzerát</h2>
-<form method="POST" enctype="multipart/form-data">
-    {% csrf_token %}
-    {{ form.as_p }}
-    <button type="submit" class="btn btn-success">Uložiť inzerát</button>
-</form>
+<div class="row justify-content-center mt-5">
+    <div class="col-lg-8 col-md-10">
+        <div class="card shadow-lg border-secondary">
+            <div class="card-header border-bottom border-secondary p-4 {% if inzerat %}bg-warning bg-opacity-10{% else %}bg-success bg-opacity-10{% endif %}">
+                <h2 class="mb-0 fw-bold {% if inzerat %}text-warning{% else %}text-success{% endif %}">
+                    {% if inzerat %}
+                        <i class="bi bi-pencil-square me-2"></i>Upraviť inzerát
+                    {% else %}
+                        <i class="bi bi-plus-circle me-2"></i>Pridať nový inzerát
+                    {% endif %}
+                </h2>
+                <p class="text-white-50 mb-0">
+                    {% if inzerat %}
+                        Upravujete detaily inzerátu: <strong>{{ inzerat.nazov }}</strong>
+                    {% else %}
+                        Zadajte informácie o predmete, ktorý chcete predať alebo darovať.
+                    {% endif %}
+                </p>
+            </div>
+
+            <div class="card-body p-4 bg-dark">
+                <form method="POST" enctype="multipart/form-data">
+                    {% csrf_token %}
+
+                    <div class="row">
+                        <div class="col-md-8 mb-3">
+                            <label class="form-label fw-bold text-info">{{ form.nazov.label }}</label>
+                            {{ form.nazov }}
+                        </div>
+                        
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label fw-bold text-info">{{ form.cena.label }}</label>
+                            <div class="input-group">
+                                {{ form.cena }}
+                                <span class="input-group-text bg-secondary border-secondary text-white">€</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-info">{{ form.popis.label }}</label>
+                        {{ form.popis }}
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold text-info">{{ form.kategoria.label }}</label>
+                            {{ form.kategoria }}
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold text-info">{{ form.typ.label }}</label>
+                            {{ form.typ }}
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label fw-bold text-info">{{ form.obrazok.label }}</label>
+                        <div class="p-3 border border-secondary border-dashed rounded bg-black bg-opacity-25">
+                            {{ form.obrazok }}
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center mt-4">
+                        <a href="{% if inzerat %}{% url 'detail_inzeratu' inzerat.pk %}{% else %}{% url 'home' %}{% endif %}" class="btn btn-outline-secondary px-4">
+                            Zrušiť
+                        </a>
+                        <button type="submit" class="btn {% if inzerat %}btn-warning{% else %}btn-success{% endif %} btn-lg px-5 fw-bold shadow">
+                            {% if inzerat %}
+                                <i class="bi bi-save me-1"></i> Aktualizovať zmeny
+                            {% else %}
+                                <i class="bi bi-check-lg me-1"></i> Uložiť inzerát
+                            {% endif %}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}

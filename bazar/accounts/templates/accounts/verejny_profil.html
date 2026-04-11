@@ -3,7 +3,7 @@
 {% block content %}
 <div class="row mt-4 pb-5">
     <div class="col-md-4">
-        <div class="card p-4 shadow-sm">
+        <div class="card bg-dark p-4 shadow-sm">
             <h3>{{ predajca.username }}</h3>
             <hr>
 
@@ -35,7 +35,7 @@
         <div class="row">
             {% for inzerat in inzeraty %}
                 <div class="col-md-6 mb-3">
-                    <div class="card h-100 shadow-sm">
+                    <div class="card bg-dark h-100 shadow-sm">
                         <div class="card-body">
                             <h5 class="card-title">{{ inzerat.nazov }}</h5>
                             <p class="price-tag">{{ inzerat.cena }} €</p>
