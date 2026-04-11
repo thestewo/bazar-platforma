@@ -121,3 +121,9 @@ body {
 footer {
     background-color: var(--bs-body-bg);
 }
+
+
+.badge-blue {
+    background-color: #00eaff !important; /* Modrá farba */
+    color: #ffffff !important;           /* Biela farba textu */
+}

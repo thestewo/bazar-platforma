@@ -35,7 +35,15 @@
                 <a class="nav-link fw-bold" href="{% url 'profil' %}">Profil ({{ user.username }})</a>
               </li>
               <li class="nav-item">
-                <a class="nav-link" href="{% url 'moje_chaty' %}">Správy</a>
+               <a href="{% url 'moje_chaty' %}" class="nav-link position-relative">
+                      Správy
+              {% if unread_count > 0 %}
+              <span class="position-absolute start-100 translate-middle badge rounded-pill badge-blue d-inline-flex align-items-center justify-content-center" 
+              style="width: 18px; height: 18px; font-size: 0.65rem; margin-top: 1px; margin-left: -3px;">
+              {{ unread_count }}
+              </span>
+              {% endif %}
+              </a>
               </li>
               <li class="nav-item">
                 <form action="{% url 'logout' %}" method="post" style="display: inline;">
