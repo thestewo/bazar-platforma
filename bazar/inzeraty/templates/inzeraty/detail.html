@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}{{ inzerat.nazov }} | GBST BAZÁR{% endblock %}
+{% load static %} {% block title %}{{ inzerat.nazov }} | GBST BAZÁR{% endblock %}
 
 {% block content %}
 <div class="container mt-4 mb-5">
@@ -27,6 +27,11 @@
                         {% endif %}
                     </div>
                 </div>
+
+
+
+                
+
 
                 <div class="card-body p-4">
                     <div class="row g-4 align-items-stretch">
@@ -147,7 +152,7 @@
 
                 <!-- Spodná lišta -->
                 <div class="card-footer bg-black bg-opacity-50 p-3 border-top border-secondary">
-                    <a href="{% url 'home' %}" class="btn btn-link text-white-50 text-decoration-none btn-sm">
+                    <a href="{% url 'home' %}" class="btn btn-link text-white text-decoration-none btn-sm">
                         <i class="bi bi-arrow-left me-1"></i> Späť na všetky inzeráty
                     </a>
                 </div>
@@ -155,4 +160,42 @@
         </div>
     </div>
 </div>
+
+
+
+<audio id="sfx-open">
+    <source src="{% static 'audio/flashbanggg.mp3' %}" type="audio/mpeg">
+</audio>
+
+<script>
+    window.addEventListener('load', () => { // 'load' čaká aj na obrázky, je to istejšie
+        const sfx = document.getElementById('sfx-open');
+        if (sfx) {
+            sfx.volume = 1 ; // Flashbang býva hlasný, ubral som na 0.3 :)
+            const playSfx = () => {
+                sfx.play().then(() => {
+                    // Ak sa podarilo prehrať, odstránime listener, aby to nehralo pri každom kliku
+                    window.removeEventListener('click', playSfx);
+                }).catch(error => {
+                    console.log("Čakám na interakciu pre SFX...");
+                });
+            };
+
+            playSfx(); 
+            window.addEventListener('click', playSfx);
+        }
+    });
+</script>
+
+
+
+
+
+
+
+
+
+
+
+
 {% endblock %}
