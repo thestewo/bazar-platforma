@@ -1,5 +1,7 @@
 from .models import Sprava
 from django.db.models import Q
+from .models import Kontakt
+
 
 def unread_messages_count(request):
     if request.user.is_authenticated:
@@ -14,3 +16,7 @@ def unread_messages_count(request):
         
         return {'unread_count': count}
     return {'unread_count': 0}
+
+def kontakt_info(request):
+    # Získame prvý záznam v databáze (ak neexistuje, vrátime None)
+    return {'kontakt': Kontakt.objects.first()}

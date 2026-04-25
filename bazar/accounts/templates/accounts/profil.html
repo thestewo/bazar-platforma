@@ -1,35 +1,124 @@
 {% extends "base.html" %}
+
 {% block content %}
 <div class="row mt-4 pb-5">
     <div class="col-md-4">
-        <h3>Moje údaje</h3>
-        <form method="POST" class="card bg-dark p-3 shadow-sm">
+        <h3 class="text-white">Moje údaje</h3>
+        <form method="POST" class="card bg-dark p-3 shadow-sm border-secondary mb-4">
             {% csrf_token %}
             {{ u_form.as_p }}
             {{ p_form.as_p }}
             <button class="btn btn-primary w-100" type="submit">Uložiť zmeny</button>
         </form>
+
+        <div class="card p-3 shadow bg-dark text-white border-secondary">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="mb-0">Recenzie na mňa</h5>
+                <div class="text-end">
+                    <span class="text-warning fw-bold">
+                        <i class="bi bi-star-fill"></i> {{ priemer|default:"0" }}
+                    </span>
+                    <div class="text-muted" style="font-size: 0.75rem;">
+                        ({{ pocet_recenzii|default:"0" }} hodnotení)
+                    </div>
+                </div>
+            </div>
+
+            <div class="dropdown mb-3">
+                <button class="btn btn-secondary btn-sm dropdown-toggle w-100 border-0" type="button" data-bs-toggle="dropdown">
+                    Zoradiť podľa
+                </button>
+                <ul class="dropdown-menu dropdown-menu-dark shadow w-100">
+                    <li><a class="dropdown-item" href="javascript:void(0)" onclick="nacitajRecenzie('new')">Najnovšie</a></li>
+                    <li><a class="dropdown-item" href="javascript:void(0)" onclick="nacitajRecenzie('old')">Najstaršie</a></li>
+                    <li><a class="dropdown-item" href="javascript:void(0)" onclick="nacitajRecenzie('best')">Najlepšie (5★)</a></li>
+                    <li><a class="dropdown-item" href="javascript:void(0)" onclick="nacitajRecenzie('worst')">Najhoršie (1★)</a></li>
+                </ul>
+            </div>
+
+            <div id="recenzie-list" style="max-height: 400px; overflow-y: auto; padding-right: 5px;">
+                {% include 'accounts/recenzie_partial.html' %}
+            </div>
+        </div>
     </div>
 
     <div class="col-md-8">
-        <h3>Moje inzeráty</h3>
+        <h3 class="text-white">Moje inzeráty</h3>
         <div class="row">
             {% for inzerat in inzeraty %}
                 <div class="col-12 mb-2">
-                    <div class="card bg-dark p-2 flex-row align-items-center justify-content-between">
-                        <div>
-                            <strong>{{ inzerat.nazov }}</strong> - {{ inzerat.cena }} €
+                    <div class="card bg-dark p-2 flex-row align-items-center justify-content-between border-secondary shadow-sm">
+                        <div class="text-white ps-2">
+                            <strong>{{ inzerat.nazov }}</strong> - <span class="text-success fw-bold">{{ inzerat.cena }} €</span>
                         </div>
-                        <div>
+                        <div class="pe-2">
                             <a href="{% url 'detail_inzeratu' inzerat.pk %}" class="btn btn-sm btn-outline-info">Pozrieť</a>
                             <a href="{% url 'upravit_inzerat' inzerat.pk %}" class="btn btn-sm btn-outline-warning">Upraviť</a>
                         </div>
                     </div>
                 </div>
             {% empty %}
-                <p class="text-muted">Ešte ste nepridali žiadny inzerát.</p>
+                <div class="col-12 text-center mt-4">
+                    <p class="text-muted small">Ešte ste nepridali žiadny inzerát.</p>
+                </div>
             {% endfor %}
         </div>
     </div>
 </div>
+
+<style>
+    /* Custom Scrollbar pre Dark Mode */
+    #recenzie-list::-webkit-scrollbar { width: 6px; }
+    #recenzie-list::-webkit-scrollbar-track { background: #222; }
+    #recenzie-list::-webkit-scrollbar-thumb { background: #444; border-radius: 10px; }
+    #recenzie-list::-webkit-scrollbar-thumb:hover { background: #555; }
+    
+    /* Vylepšenie vzhľadu formulárov v dark mode */
+    form p label { display: block; font-size: 0.9rem; color: #adb5bd; margin-bottom: 2px; }
+    form p input, form p select, form p textarea { 
+        width: 100%; 
+        background: #2b3035 !important; 
+        border: 1px solid #495057 !important; 
+        color: white !important;
+        border-radius: 5px;
+        padding: 5px 10px;
+        margin-bottom: 10px;
+    }
+    form p input:focus {
+        border-color: #0d6efd !important;
+        outline: none;
+        box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+    }
+</style>
+
+<script>
+// Funkcia na dynamické načítanie bez refreshu
+function nacitajRecenzie(sortType) {
+    const url = window.location.pathname + '?sort=' + sortType;
+    
+    fetch(url, {
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    })
+    .then(response => {
+        if (!response.ok) throw new Error("Chyba servera");
+        return response.text();
+    })
+    .then(html => {
+        document.getElementById('recenzie-list').innerHTML = html;
+        // Aktualizujeme URL v prehliadači bez refreshu
+        window.history.pushState({ sort: sortType }, '', url);
+    })
+    .catch(err => console.error("Chyba pri načítaní recenzií:", err));
+}
+
+
+// Obsluha tlačidla "späť" v prehliadači
+window.onpopstate = function(event) {
+    if (event.state && event.state.sort) {
+        nacitajRecenzie(event.state.sort);
+    } else {
+        location.reload();
+    }
+};
+</script>
 {% endblock %}

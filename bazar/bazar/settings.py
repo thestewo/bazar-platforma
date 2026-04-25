@@ -1,7 +1,10 @@
 from pathlib import Path
 import os
 from dotenv import load_dotenv
+import mimetypes
 
+
+mimetypes.add_type("image/webp", ".webp", True)
 load_dotenv()
 SECRET_KEY = os.getenv('SECRET_KEY')
 DEBUG = os.getenv('DEBUG', 'False') == 'True'
@@ -54,6 +57,7 @@ TEMPLATES = [
                 'django.contrib.messages.context_processors.messages',
                 'django.template.context_processors.debug',
                 'inzeraty.context_processors.unread_messages_count',
+                'inzeraty.context_processors.kontakt_info', 
             ],
         },
     },

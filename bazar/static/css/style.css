@@ -53,9 +53,12 @@
 
 .card-img-top {
     width: 100%;        
-    height: 320px;      
-    object-fit: cover;  
+    height: 250px; /* Alebo tvojich 320px, podľa toho čo preferuješ */
+    /* ZMENA: contain namiesto cover */
+    object-fit: contain;  
     object-position: center; 
+    /* Pridaj čierne pozadie pre "pásiky", ak fotka nemá správny pomer */
+    background-color: #000; 
 }
 
 .detail-container {
@@ -89,12 +92,14 @@ padding-bottom: 50px;
 
 /* Samotný obrázok - prispôsobí sa kontajneru */
 .detail-img-container img {
-    max-width: 100%; /* Nikdy nepresiahne šírku stĺpca */
-    max-height: 100%; /* Nikdy nepresiahne nastavených 550px */
-    object-fit: contain; /* Zmenší sa, ale NIKDY sa neořeže. Uvidíš celú fotku. */
+    max-width: 100%; 
+    max-height: 100%; 
+    /* ZMENA: contain zabezpečí, že uvidíš celú fotku bez orezu */
+    object-fit: contain; 
     display: block;
+    /* Pridaj toto, aby fotka nebola "nalepená" na okrajoch, ak je príliš veľká */
+    padding: 10px; 
 }
-
 /* Responzivita pre mobily */
 @media (max-width: 768px) {
     .detail-img-container {
@@ -126,4 +131,51 @@ footer {
 .badge-blue {
     background-color: #00eaff !important; /* Modrá farba */
     color: #ffffff !important;           /* Biela farba textu */
+}
+
+.chat-zoom-img:hover {
+    filter: brightness(0.9);
+    transform: scale(1.01);
+    transition: all 0.2s ease-in-out;
+}
+
+/* Tmavšie pozadie za modalom pre lepší kontrast */
+#imageModal {
+    background-color: rgba(0, 0, 0, 0.85);
+}
+
+img {
+    image-rendering: -webkit-optimize-contrast; /* Pre Safari/Chrome */
+    image-rendering: high-quality;
+}
+
+
+.video-modal {
+    position: fixed; z-index: 9999; left: 0; top: 0; width: 100%; height: 100%;
+    background-color: rgba(0,0,0,0.9); display: flex; align-items: center; justify-content: center;
+}
+#overlayVideo { max-width: 90%; max-height: 90%; border-radius: 10px; }
+.video-container { position: relative; width: 200px; cursor: pointer; }
+.play-overlay { 
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    font-size: 3rem; color: white; opacity: 0.8;
+}
+
+
+.custom-navbar-logo {
+    height: 35px; /* Tu si nastavíš veľkosť */
+    width: auto;
+    transition: transform 0.3s ease; /* Bonus: jemný efekt pri prejdení myšou */
+}
+
+.custom-navbar-logo:hover {
+    transform: scale(1.05); /* Logo sa mierne zväčší */
+}
+
+.badge-location {
+    font-weight: 400;
+    font-size: 0.75rem;
+    padding: 4px 8px;
+    border-radius: 6px;
+    background-color: rgba(255, 255, 255, 0.05);
 }
