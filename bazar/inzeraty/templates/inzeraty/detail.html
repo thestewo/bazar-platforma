@@ -15,7 +15,7 @@
                             <nav aria-label="breadcrumb">
                                 <ol class="breadcrumb mb-1">
                                     <li class="breadcrumb-item small"><a href="{% url 'home' %}" class="text-info text-decoration-none">Domov</a></li>
-                                    <li class="breadcrumb-item small text-white-50 active">{{ inzerat.kategoria.nazov|default:"Bez kategórie" }}</li>
+                                    <li class="breadcrumb-item small text-white-50 active">{{ inzerat.kategoria.nazov|default:"Všeobecné" }}</li>
                                 </ol>
                             </nav>
                             <h2 class="mb-0 fw-bold" style="letter-spacing: 1px;">{{ inzerat.nazov }}</h2>
