@@ -1,0 +1,41 @@
+{% for r in recenzie %}
+    <div class="border-bottom border-secondary mb-2 pb-2 position-relative {% if r.autor == user %}bg-dark-subtle p-2 rounded{% endif %}">
+        
+        {% if r.autor == user %}
+            <span class="badge bg-primary mb-1" style="font-size: 0.6rem;">Vaša recenzia</span>
+        {% endif %}
+
+        <div class="text-warning small">
+            {% for i in "12345" %}
+                <i class="bi bi-star{% if forloop.counter <= r.hviezdicky %}-fill{% endif %}"></i>
+            {% endfor %}
+        </div>
+
+        <div class="small fw-bold">
+            <a href="{% url 'verejny_profil' r.autor.username %}" class="text-info text-decoration-none hover-underline">
+                {{ r.autor.username }}
+            </a>
+        </div>
+
+        <div class="small text-muted" style="font-size: 0.8rem;">{{ r.text }}</div>
+
+        {% if r.autor == user and not je_moj_profil %}
+        <div class="position-absolute top-0 end-0 mt-1 pe-2">
+            <a href="javascript:void(0)" onclick="pripravUpravu('{{ r.hviezdicky }}', '{{ r.text|escapejs }}')" class="text-warning me-2" title="Upraviť">
+                <i class="bi bi-pencil-square"></i>
+            </a>
+            <a href="javascript:void(0)" onclick="zmazatRecenziu('{{ r.id }}')" class="text-danger" title="Zmazať">
+                <i class="bi bi-trash"></i>
+            </a>
+        </div>
+        {% endif %}
+    </div>
+{% empty %}
+    <p class="text-muted small text-center py-3">Zatiaľ žiadne recenzie.</p>
+{% endfor %}
+
+<style>
+    .hover-underline:hover {
+        text-decoration: underline !important;
+    }
+</style>

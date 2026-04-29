@@ -1,45 +1,106 @@
 from django.shortcuts import render
-from inzeraty.models import Inzerat
-from django.http import JsonResponse
-from django.http import HttpResponse
-import traceback
-# Create your views here.
+from inzeraty.models import Inzerat, Kategoria, Typ
+from django.db.models import Q
+import requests
+from math import radians, cos, sin, asin, sqrt
 
-from inzeraty.models import Inzerat, Kategoria, Typ  # Pridaná Kategoria a Typ
-from django.db.models import Q                 # Pridané pre vyhľadávanie
+# 1. Pomocné funkcie
+def haversine(lon1, lat1, lon2, lat2):
+    try:
+        lon1, lat1, lon2, lat2 = map(radians, [float(lon1), float(lat1), float(lon2), float(lat2)])
+        dlon = lon2 - lon1 
+        dlat = lat2 - lat1 
+        a = sin(dlat/2)**2 + cos(lat1) * cos(lat2) * sin(dlon/2)**2
+        c = 2 * asin(sqrt(a)) 
+        return 6371 * c
+    except:
+        return 9999
 
+def ziskaj_suradnice(mesto_text):
+    """Premení názov mesta na lat, lon a vráti oficiálny názov s diakritikou."""
+    if not mesto_text:
+        return None, None, None
+    try:
+        url = (
+            f"https://nominatim.openstreetmap.org/search?"
+            f"format=json&q={mesto_text}&limit=1&addressdetails=1"
+            f"&accept-language=sk&countrycodes=sk&featuretype=settlement"
+        )
+        
+        response = requests.get(url, headers={'User-Agent': 'NOVU_App_Educational'}, timeout=5)
+        data = response.json()
+        
+        if data:
+            lat = float(data[0]['lat'])
+            lon = float(data[0]['lon'])
+            
+            addr = data[0].get('address', {})
+            pekny_nazov = addr.get('city') or addr.get('town') or addr.get('village') or addr.get('municipality')
+            
+            if not pekny_nazov:
+                pekny_nazov = data[0].get('display_name', '').split(',')[0]
+                
+            return lat, lon, pekny_nazov
+            
+    except Exception as e:
+        print(f"Chyba pri získavaní súradníc: {e}")
+    
+    return None, None, None
+
+# 2. Funkcia home
 def home(request):
-    # Základný zoznam aktívnych inzerátov
     inzeraty = Inzerat.objects.filter(je_aktivny=True)
     kategorie = Kategoria.objects.all()
-    typy = Typ.objects.all()  # Získanie všetkých typov pre zobrazenie vo formulári
+    typy = Typ.objects.all()
 
-    # Získanie dát z vyhľadávacieho formulára (metóda GET)
     query = request.GET.get('q')
     kat_id = request.GET.get('kategoria')
     t_id = request.GET.get('typ')
     min_cena = request.GET.get('min_cena')
     max_cena = request.GET.get('max_cena')
-
-    # Filtrovanie podľa textu (názov alebo popis)
-    if query:
-        inzeraty = inzeraty.filter(
-            Q(nazov__icontains=query) | Q(popis__icontains=query)
-        )
     
-    # Filter podľa kategórie
+    mesto_hladane = request.GET.get('l') 
+    okruh = request.GET.get('r')         
+
+    if query:
+        inzeraty = inzeraty.filter(Q(nazov__icontains=query) | Q(popis__icontains=query))
     if kat_id:
         inzeraty = inzeraty.filter(kategoria_id=kat_id)
-    
     if t_id:
         inzeraty = inzeraty.filter(typ_id=t_id)
-
-    # Filter podľa ceny (od - do)
     if min_cena:
         inzeraty = inzeraty.filter(cena__gte=min_cena)
     if max_cena:
         inzeraty = inzeraty.filter(cena__lte=max_cena)
 
-    # Zoradenie a finálny render
+    if mesto_hladane:
+        # OPRAVA: Pridané _ pre tretiu vracanú hodnotu (názov), ktorú tu nepotrebujeme
+        h_lat, h_lon, _ = ziskaj_suradnice(mesto_hladane)
+        
+        if h_lat and h_lon:
+            if okruh and okruh.strip():
+                try:
+                    okruh_val = float(okruh)
+                    id_v_okruhu = []
+                    vsetky_so_suradnicami = inzeraty.filter(lat__isnull=False, lon__isnull=False)
+                    
+                    for inz in vsetky_so_suradnicami:
+                        vzdialenost = haversine(h_lon, h_lat, inz.lon, inz.lat)
+                        if vzdialenost <= okruh_val:
+                            id_v_okruhu.append(inz.id)
+                    
+                    inzeraty = inzeraty.filter(id__in=id_v_okruhu)
+                except ValueError:
+                    inzeraty = inzeraty.filter(lokalita__icontains=mesto_hladane)
+            else:
+                inzeraty = inzeraty.filter(lokalita__icontains=mesto_hladane)
+        else:
+            inzeraty = inzeraty.filter(lokalita__icontains=mesto_hladane)
+
     inzeraty = inzeraty.order_by('-vytvorene')
-    return render(request, 'home.html', {'inzeraty': inzeraty,'kategorie': kategorie, 'typy': typy})
+    
+    return render(request, 'home.html', {
+        'inzeraty': inzeraty,
+        'kategorie': kategorie,
+        'typy': typy
+    })

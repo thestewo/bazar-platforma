@@ -38,16 +38,24 @@
         <div class="p-3 rounded shadow-sm {% if sprava.odosielatel == user %}bg-primary text-white{% else %}bg-secondary text-white{% endif %}">
             
             {% if sprava.text %}
-                <div style="word-break: break-word;">{{ sprava.text }}</div>
+                <div class="mb-2" style="word-break: break-word;">{{ sprava.text }}</div>
             {% endif %}
 
             {% if sprava.obrazok %}
-                <div class="{% if sprava.text %}mt-2{% endif %}">
-                    <a href="{{ sprava.obrazok.url }}" target="_blank">
-                        <img src="{{ sprava.obrazok.url }}" alt="Obrázok v správe" 
-                             class="img-fluid rounded border border-light shadow-sm" 
-                             style="max-height: 250px; cursor: pointer;">
-                    </a>
+                <div class="mb-2">
+                    <img src="{{ sprava.obrazok.url }}" alt="Obrázok" 
+                         class="img-fluid rounded border border-light shadow-sm" 
+                         style="max-height: 250px; cursor: pointer;"
+                         onclick="otvorFotku('{{ sprava.obrazok.url }}')">
+                </div>
+            {% endif %}
+
+            {% if sprava.video %}
+                <div class="mb-2 position-relative" style="max-width: 250px; cursor: pointer;" onclick="otvorVideo('{{ sprava.video.url }}')">
+                    <video src="{{ sprava.video.url }}" class="img-fluid rounded border border-light shadow-sm" style="max-height: 250px;"></video>
+                    <div class="position-absolute top-50 start-50 translate-middle">
+                        <i class="bi bi-play-circle-fill" style="font-size: 3rem; color: white; opacity: 0.8;"></i>
+                    </div>
                 </div>
             {% endif %}
 

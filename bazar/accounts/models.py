@@ -20,3 +20,13 @@ def vytvor_profil(sender, instance, created, **kwargs):
 @receiver(post_save, sender=User)
 def uloz_profil(sender, instance, **kwargs):
     instance.profile.save()
+
+class Recenzia(models.Model):
+    autor = models.ForeignKey(User, on_delete=models.CASCADE, related_name='vytvorene_recenzie')
+    prijimatel = models.ForeignKey(User, on_delete=models.CASCADE, related_name='recenzie')
+    hviezdicky = models.IntegerField(default=5)
+    text = models.TextField()
+    vytvorene = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-vytvorene'] # Predvolene najnovšie
