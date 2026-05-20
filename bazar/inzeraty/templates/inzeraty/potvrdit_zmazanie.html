@@ -1,25 +1,26 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="container mt-5">
-    <div class="card border-danger shadow-sm mx-auto" style="max-width: 600px;">
-        <div class="card-header bg-danger text-white">
-            <h4 class="mb-0">Potvrdenie o uzavretí inzerátu</h4>
-        </div>
-        <div class="card-body py-4 text-center">
-            <h5 class="card-title">Chcete stiahnuť inzerát <strong>"{{ inzerat.nazov }}"</strong> z ponuky?</h5>
-            <p class="card-text text-muted">
-                Inzerát už nebude viditeľný pre ostatných používateľov. <br>
-                História vašich doterajších konverzácií k tomuto inzerátu zostane zachovaná.
-            </p>
+<div class="row justify-content-center mt-5">
+    <div class="col-md-6 col-lg-5">
+        <div class="card shadow-lg border-danger bg-dark text-white" style="border-radius: 15px;">
+            <div class="card-header border-bottom border-secondary bg-danger bg-opacity-10 p-4">
+                <h4 class="mb-0 fw-bold text-danger"><i class="bi bi-exclamation-triangle me-2"></i>Uzavrieť inzerát</h4>
+            </div>
             
-            <hr>
-
-            <form method="POST" class="d-inline">
-                {% csrf_token %}
-                <button type="submit" class="btn btn-danger px-4">Áno, uzavrieť inzerát</button>
-            </form>
-            <a href="{% url 'detail_inzeratu' inzerat.pk %}" class="btn btn-outline-secondary px-4 ms-2">Zrušiť</a>
+            <div class="card-body p-4 text-center">
+                <h5 class="fw-bold mb-3">Chcete stiahnuť inzerát <strong>"{{ inzerat.nazov }}"</strong> z ponuky?</h5>
+                <p class="text-white-50 small mb-4">
+                    Inzerát už nebude viditeľný pre ostatných používateľov.<br>
+                    História doterajších konverzácií zostane zachovaná.
+                </p>
+                
+                <form method="POST" class="d-flex gap-3 justify-content-center">
+                    {% csrf_token %}
+                    <a href="{% url 'detail_inzeratu' inzerat.pk %}" class="btn btn-outline-secondary px-4 text-white text-decoration-none">Zrušiť</a>
+                    <button type="submit" class="btn btn-danger px-4 fw-bold shadow">Áno, uzavrieť</button>
+                </form>
+            </div>
         </div>
     </div>
 </div>

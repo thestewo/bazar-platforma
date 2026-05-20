@@ -25,6 +25,9 @@ urlpatterns = [
     path('chat/nacitat/<int:konverzacia_id>/', views.nacitat_spravy, name='nacitat_spravy'),
     path('chat/sprava/zmazat/<int:sprava_id>/', views.zmazat_spravu, name='zmazat_spravu'),
     path('sprava/upravit/<int:sprava_id>/', views.upravit_spravu, name='upravit_spravu'),
+    
+    # AI ANALÝZA (AJAX)
+    path('<int:pk>/ai-analyza/', views.ai_analyza_ajax, name='ai_analyza_ajax'),
 
 ]
 

@@ -8,7 +8,10 @@ from django.core.exceptions import ValidationError
 class RegisterForm(UserCreationForm):
     email = forms.EmailField(label="E-mail", widget=forms.EmailInput(attrs={'class': 'form-control', 'placeholder': 'nieco@gbst.sk'}))
     username = forms.CharField(label="Používateľské meno", widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Zadajte meno'}))
-
+    suhlas = forms.BooleanField(
+        required=True, 
+        label="Súhlasím s obchodnými podmienkami a spracovaním osobných údajov (GDPR)"
+    )
     class Meta:
         model = User
         fields = ["username", "email"]
@@ -17,8 +20,11 @@ class RegisterForm(UserCreationForm):
         super().__init__(*args, **kwargs)
         
         # 1. Hromadné pridanie Bootstrap triedy pre všetky polia
-        for field in self.fields.values():
-            field.widget.attrs.update({'class': 'form-control'})
+        for name, field in self.fields.items():
+            if name == 'suhlas':
+                field.widget.attrs.update({'class': 'form-check-input'})
+            else:
+                field.widget.attrs.update({'class': 'form-control'})
             
         # 2. Preklad labelov pre heslá
         self.fields['password1'].label = "Heslo"
@@ -78,7 +84,3 @@ class CustomLoginForm(AuthenticationForm):
                     params={'username': self.username_field.verbose_name},
                 )
         return self.cleaned_data
-
-
-
-

@@ -30,3 +30,26 @@ class Recenzia(models.Model):
 
     class Meta:
         ordering = ['-vytvorene'] # Predvolene najnovšie
+
+class Report(models.Model):
+    DOVOD_CHOICES = [
+        ('podvod', 'Podvodný inzerát / Neodoslaný tovar'),
+        ('vulgarnost', 'Vulgárne správanie'),
+        ('spam', 'Spam / Reklama'),
+        ('ine', 'Iný dôvod'),
+    ]
+
+    zalobca = models.ForeignKey(User, on_delete=models.CASCADE, related_name='podane_hlasenia')
+    obvineny = models.ForeignKey(User, on_delete=models.CASCADE, related_name='nahlásenia')
+    dovod = models.CharField(max_length=20, choices=DOVOD_CHOICES)
+    popis = models.TextField(blank=True)
+    vytvorene = models.DateTimeField(auto_now_add=True)
+    vyriesene = models.BooleanField(default=False) # Pre tvoju evidenciu v admine
+
+    def __str__(self):
+        return f"{self.zalobca} nahlásil {self.obvineny} - {self.dovod}"
+    
+    class Meta:
+        verbose_name = "Nahlásenie"
+        verbose_name_plural = "Nahlásenia"
+        unique_together = ('zalobca', 'obvineny')

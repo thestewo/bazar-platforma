@@ -47,13 +47,12 @@ def ziskaj_suradnice(mesto_text):
     
     return None, None, None
 
-# 2. Funkcia home
 def home(request):
     inzeraty = Inzerat.objects.filter(je_aktivny=True)
     kategorie = Kategoria.objects.all()
     typy = Typ.objects.all()
 
-    query = request.GET.get('q')
+    q = request.GET.get('q')
     kat_id = request.GET.get('kategoria')
     t_id = request.GET.get('typ')
     min_cena = request.GET.get('min_cena')
@@ -62,8 +61,12 @@ def home(request):
     mesto_hladane = request.GET.get('l') 
     okruh = request.GET.get('r')         
 
-    if query:
-        inzeraty = inzeraty.filter(Q(nazov__icontains=query) | Q(popis__icontains=query))
+    if q:
+        inzeraty = inzeraty.filter(
+        Q(nazov__icontains=q) | 
+        Q(popis__icontains=q) | 
+        Q(skryte_tagy__icontains=q)
+    ).distinct()
     if kat_id:
         inzeraty = inzeraty.filter(kategoria_id=kat_id)
     if t_id:
@@ -104,3 +107,29 @@ def home(request):
         'kategorie': kategorie,
         'typy': typy
     })
+
+def vop_view(request):
+    return render(request, 'vop.html')
+
+def gdpr_view(request):
+    return render(request, 'gdpr.html')
+
+from django.http import HttpResponse, JsonResponse
+from .models import Ticket
+
+def vytvor_ticket(request):
+    if request.method == 'POST':
+        email = request.POST.get('email')
+        if request.user.is_authenticated:
+            email = request.user.email
+
+        ticket = Ticket.objects.create(
+            autor=request.user if request.user.is_authenticated else None,
+            email=email,
+            typ=request.POST.get('typ', 'navrh'),
+            predmet=request.POST.get('predmet'),
+            sprava=request.POST.get('sprava')
+        )
+        return HttpResponse(status=200)
+        
+    return HttpResponse(status=400) # GET požiadavky na túto URL ignorujeme

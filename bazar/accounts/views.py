@@ -1,4 +1,5 @@
 from django.shortcuts import render, redirect, get_object_or_404
+from requests import request
 from .forms import RegisterForm, UserUpdateForm, ProfileUpdateForm
 from django.contrib.auth.decorators import login_required
 from inzeraty.models import Inzerat
@@ -12,6 +13,8 @@ from django.contrib.auth import views as auth_views
 from accounts.models import Recenzia
 from django.http import HttpResponse
 from django.db.models import Avg
+from .models import Report
+
 class MyLoginView(auth_views.LoginView):
     def form_valid(self, form):
         messages.success(self.request, f"Vitajte späť, {form.get_user().username}!")
@@ -149,6 +152,11 @@ def verejny_profil(request, username):
     if request.user.is_authenticated:
         uz_hodnotil = Recenzia.objects.filter(autor=request.user, prijimatel=pouzivatel).exists()
 
+    uz_nahlasil = False
+    if request.user.is_authenticated:
+        uz_nahlasil = Report.objects.filter(zalobca=request.user, obvineny=pouzivatel).exists()
+
+
     context = {
         'predajca': pouzivatel,
         'inzeraty': Inzerat.objects.filter(autor=pouzivatel).order_by('-vytvorene'),
@@ -158,6 +166,7 @@ def verejny_profil(request, username):
         'priemer': priemer_hviezdiciek,
         'pocet_recenzii': vsetky_recenzie.count(),
         'je_moj_profil': False,
+        'uz_nahlasil': uz_nahlasil,
     }
 
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
@@ -207,3 +216,32 @@ def zmazat_recenziu(request, recenzia_id):
         return HttpResponse(status=200)
         
     return redirect('verejny_profil', username=username)
+
+@login_required
+def nahlasit_pouzivatela(request, user_id):
+    if request.method == 'POST':
+        obvineny = get_object_or_404(User, id=user_id)
+        
+        if request.user == obvineny:
+            return HttpResponse("Nemôžete nahlásiť sami seba.", status=400)
+
+        # KONTROLA: Už si ho nahlásil?
+        uz_nahlasil = Report.objects.filter(zalobca=request.user, obvineny=obvineny).exists()
+        
+        if uz_nahlasil:
+            # Ak je to AJAX, vrátime chybu 400, ktorú zachytíme v JS
+            return HttpResponse("Tohto používateľa ste už nahlásili.", status=400)
+            
+        dovod = request.POST.get('dovod')
+        popis = request.POST.get('popis', '')
+        
+        if dovod:
+            Report.objects.create(
+                zalobca=request.user,
+                obvineny=obvineny,
+                dovod=dovod,
+                popis=popis
+            )
+            return HttpResponse(status=200)
+            
+    return HttpResponse("Neplatná požiadavka", status=400)

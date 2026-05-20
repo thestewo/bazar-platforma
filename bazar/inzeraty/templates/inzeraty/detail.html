@@ -22,77 +22,59 @@
                         </div>
                         
                         <div class="d-flex align-items-center gap-3 bg-dark p-2 px-3 rounded border border-secondary shadow-sm">
-    <div class="text-center px-2">
-        <span class="d-block small text-white-50 text-uppercase" style="font-size: 0.7rem;">Cena</span>
-        <h4 class="mb-0 text-primary fw-bold">{{ inzerat.cena }} €</h4>
-    </div>
-    
-    <div class="vr bg-secondary" style="height: 30px;"></div>
-    
-    <div class="text-center px-2">
-        <span class="d-block small text-white-50 text-uppercase" style="font-size: 0.7rem;">Kategória</span>
-        <span class="fw-bold text-info small">{{ inzerat.kategoria.nazov|default:"Všeobecné" }}</span>
-    </div>
-
-    <div class="vr bg-secondary" style="height: 30px;"></div>
-
-    <div class="text-center px-2">
-        <span class="d-block small text-white-50 text-uppercase" style="font-size: 0.7rem;">Lokalita</span>
-        <span class="fw-bold text-white small">
-            <i class="bi bi-geo-alt-fill text-danger me-1"></i>{{ inzerat.lokalita|default:"Celá SR" }}
-        </span>
-    </div>
-    <div class="vr bg-secondary" style="height: 30px;"></div>
-    
-    <div class="px-2">
-        {% if not inzerat.je_aktivny %}
-            <span class="badge bg-danger text-uppercase">Uzavreté</span>
-        {% else %}
-            <span class="badge bg-success text-uppercase">Aktívne</span>
-        {% endif %}
-    </div>
-
-    {% if inzerat.typ %}
-    <div class="ps-2 border-start border-secondary border-opacity-25">
-        <span class="badge {% if inzerat.typ.nazov == 'Predaj' %}bg-info text-dark{% else %}bg-warning text-dark{% endif %} text-uppercase">
-            {{ inzerat.typ.nazov }}
-        </span>
-    </div>
-    {% endif %}
-</div>
+                            <div class="text-center px-2">
+                                <span class="d-block small text-white-50 text-uppercase" style="font-size: 0.7rem;">Cena</span>
+                                <h4 class="mb-0 text-primary fw-bold">{{ inzerat.cena }} €</h4>
+                            </div>
+                            <div class="vr bg-secondary" style="height: 30px;"></div>
+                            <div class="text-center px-2">
+                                <span class="d-block small text-white-50 text-uppercase" style="font-size: 0.7rem;">Kategória</span>
+                                <span class="fw-bold text-info small">{{ inzerat.kategoria.nazov|default:"Všeobecné" }}</span>
+                            </div>
+                            <div class="vr bg-secondary" style="height: 30px;"></div>
+                            <div class="text-center px-2">
+                                <span class="d-block small text-white-50 text-uppercase" style="font-size: 0.7rem;">Lokalita</span>
+                                <span class="fw-bold text-white small"><i class="bi bi-geo-alt-fill text-danger me-1"></i>{{ inzerat.lokalita|default:"Celá SR" }}</span>
+                            </div>
+                            <div class="vr bg-secondary" style="height: 30px;"></div>
+                            <div class="px-2">
+                                <span class="badge {% if not inzerat.je_aktivny %}bg-danger{% else %}bg-success{% endif %} text-uppercase">
+                                    {% if not inzerat.je_aktivny %}Uzavreté{% else %}Aktívne{% endif %}
+                                </span>
+                            </div>
+                            {% if inzerat.typ %}
+                            <div class="ps-2 border-start border-secondary border-opacity-25">
+                                <span class="badge {% if inzerat.typ.nazov == 'Predaj' %}bg-info text-dark{% else %}bg-warning text-dark{% endif %} text-uppercase">{{ inzerat.typ.nazov }}</span>
+                            </div>
+                            {% endif %}
+                        </div>
                     </div>
                 </div>
 
                 <div class="card-body p-0" style="background-color: #212529;">
-                    
-                    <div style="background-color: #212529; min-height: 600px; display: flex !important; align-items: center !important; justify-content: center !important; width: 100%; position: relative;">
-                        
+                    <div style="background-color: #212529; min-height: 600px; display: flex; align-items: center; justify-content: center; width: 100%; position: relative;">
                         {% if inzerat.obrazok %}
                             {% if inzerat.dodatocne_obrazky.exists %}
                                 <div id="inzeratCarousel" class="carousel slide w-100" data-bs-interval="false">
                                     <div class="carousel-inner">
                                         <div class="carousel-item active">
-                                            <div style="height: 600px; display: flex !important; align-items: center !important; justify-content: center !important; cursor: zoom-in;">
+                                            <div style="height: 600px; display: flex; align-items: center; justify-content: center; cursor: zoom-in;">
                                                 <img src="{{ inzerat.obrazok.url }}" class="img-fluid open-overlay" data-img-index="0" style="max-height: 580px; width: auto; object-fit: contain;" alt="Hlavná fotka">
                                             </div>
                                         </div>
                                         {% for foto in inzerat.dodatocne_obrazky.all %}
                                         <div class="carousel-item">
-                                            <div style="height: 600px; display: flex !important; align-items: center !important; justify-content: center !important; cursor: zoom-in;">
+                                            <div style="height: 600px; display: flex; align-items: center; justify-content: center; cursor: zoom-in;">
                                                 <img src="{{ foto.obrazok.url }}" class="img-fluid open-overlay" data-img-index="{{ forloop.counter }}" style="max-height: 580px; width: auto; object-fit: contain;" alt="Fotka {{ forloop.counter }}">
                                             </div>
                                         </div>
                                         {% endfor %}
                                     </div>
-                                    <button class="carousel-control-prev custom-nav" type="button" data-bs-target="#inzeratCarousel" data-bs-slide="prev">
-                                        <span class="carousel-control-prev-icon"></span>
-                                    </button>
-                                    <button class="carousel-control-next custom-nav" type="button" data-bs-target="#inzeratCarousel" data-bs-slide="next">
-                                        <span class="carousel-control-next-icon"></span>
-                                    </button>
+                                    <button class="carousel-control-prev custom-nav" type="button" data-bs-target="#inzeratCarousel" data-bs-slide="prev"><span class="carousel-control-prev-icon"></span></button>
+                                    <button class="carousel-control-next custom-nav" type="button" data-bs-target="#inzeratCarousel" data-bs-slide="next"><span class="carousel-control-next-icon"></span></button>
                                 </div>
                             {% else %}
-                                <div style="width: 100%; height: 600px; display: flex !important; align-items: center !important; justify-content: center !important; cursor: zoom-in;">
+                                <div style="width: 100%; height: 600px; display: flex; align-items: center; justify-content: center; cursor: zoom-in;">
                                     <img src="{{ inzerat.obrazok.url }}" class="img-fluid open-overlay" data-img-index="0" style="max-height: 580px; width: auto; object-fit: contain;" alt="Jediná fotka">
                                 </div>
                             {% endif %}
@@ -107,32 +89,43 @@
                     {% if inzerat.dodatocne_obrazky.exists %}
                     <div class="d-flex justify-content-center gap-3 p-4 border-top border-bottom border-secondary bg-black bg-opacity-25 overflow-auto shadow-inner">
                         <div class="ebay-thumb-container active" data-bs-target="#inzeratCarousel" data-bs-slide-to="0">
-                            <div class="ebay-thumb-box bg-dark">
-                                <img src="{{ inzerat.obrazok.url }}">
-                            </div>
+                            <div class="ebay-thumb-box bg-dark"><img src="{{ inzerat.obrazok.url }}"></div>
                         </div>
                         {% for foto in inzerat.dodatocne_obrazky.all %}
                         <div class="ebay-thumb-container" data-bs-target="#inzeratCarousel" data-bs-slide-to="{{ forloop.counter }}">
-                            <div class="ebay-thumb-box bg-dark">
-                                <img src="{{ foto.obrazok.url }}">
-                            </div>
+                            <div class="ebay-thumb-box bg-dark"><img src="{{ foto.obrazok.url }}"></div>
                         </div>
                         {% endfor %}
                     </div>
                     {% endif %}
 
                     <div class="p-5" style="background-color: #212529;">
-                        <div class="p-4 rounded bg-dark border border-secondary shadow-sm">
+                        <div class="p-4 rounded bg-dark border border-secondary shadow-sm mb-4">
                             <h5 class="text-info text-uppercase mb-3 small fw-bold" style="letter-spacing: 2px;">Popis produktu</h5>
                             <div class="fs-5 lh-base" style="white-space: pre-wrap; color: #f0f0f0;">{{ inzerat.popis }}</div>
                         </div>
                         
+                        <div class="p-4 mb-4 rounded border border-info shadow-sm" style="background-color: rgba(13, 202, 240, 0.05);">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h5 class="text-info text-uppercase m-0 small fw-bold" style="letter-spacing: 2px;"><i class="bi bi-robot me-2"></i> AI Poradca</h5>
+                                <button id="btn-ai-start" class="btn btn-outline-info btn-sm fw-bold" data-url="{% url 'ai_analyza_ajax' inzerat.pk %}">
+                                    Získať AI analýzu ceny a rizík
+                                </button>
+                            </div>
+                            <div id="ai-content" class="fs-6 lh-base text-white opacity-90 d-none"></div>
+                            <small class="text-muted mt-3 d-block" style="font-size: 0.75rem; opacity: 0.6;">
+                                ℹ️ Analýza je generovaná umelou inteligenciou a má informatívny charakter. Pred kúpou si inzerát vždy preverte osobne.
+                            </small>
+                            <div id="ai-loading" class="text-center d-none p-3">
+                                <div class="spinner-border text-info spinner-border-sm" role="status"></div>
+                                <span class="ms-2 small text-info">AI robí prieskum trhu, počkajte chvíľu...</span>
+                            </div>
+                        </div>
+
                         <div class="row g-4 align-items-center mt-5 bg-dark p-4 rounded border border-secondary mx-0 shadow-sm" style="min-height: 110px;">
                             <div class="col-md-3 border-end border-secondary d-flex flex-column justify-content-center h-100">
                                 <span class="text-white-50 small d-block text-uppercase mb-1" style="font-size: 0.7rem;">Zverejnené</span>
-                                <span class="fw-bold text-white fs-6">
-                                    <i class="bi bi-calendar3 me-2 text-info"></i>{{ inzerat.vytvorene|date:"d. m. Y" }}
-                                </span>
+                                <span class="fw-bold text-white fs-6"><i class="bi bi-calendar3 me-2 text-info"></i>{{ inzerat.vytvorene|date:"d. m. Y" }}</span>
                             </div>
                             
                             <div class="col-md-4 border-end border-secondary d-flex flex-column justify-content-center h-100 px-4">
@@ -141,9 +134,7 @@
                                     <div class="bg-info rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; min-width: 32px;">
                                         <i class="bi bi-person-fill text-dark fs-6"></i>
                                     </div>
-                                    <a href="{% url 'verejny_profil' inzerat.autor.username %}" class="text-info text-decoration-none fw-bold text-truncate fs-6">
-                                        {{ inzerat.autor.username }}
-                                    </a>
+                                    <a href="{% url 'verejny_profil' inzerat.autor.username %}" class="text-info text-decoration-none fw-bold text-truncate fs-6">{{ inzerat.autor.username }}</a>
                                 </div>
                             </div>
 
@@ -153,18 +144,12 @@
                                         {% if user.is_authenticated %}
                                             {% if user != inzerat.autor %}
                                                 {% if inzerat.je_aktivny %}
-                                                    <a href="{% url 'zacat_chat' inzerat.id %}" class="btn btn-success btn-lg w-100 shadow-sm fw-bold py-2">
-                                                        <i class="bi bi-chat-dots-fill me-2"></i> POSLAŤ SPRÁVU
-                                                    </a>
+                                                    <a href="{% url 'zacat_chat' inzerat.id %}" class="btn btn-success btn-lg w-100 shadow-sm fw-bold py-2"><i class="bi bi-chat-dots-fill me-2"></i> POSLAŤ SPRÁVU</a>
                                                 {% endif %}
                                             {% else %}
                                                 <div class="d-flex gap-2 align-items-stretch">
-                                                    <a href="{% url 'upravit_inzerat' inzerat.pk %}" class="btn btn-warning flex-grow-1 text-dark fw-bold py-2 d-flex align-items-center justify-content-center">
-                                                        <i class="bi bi-pencil-square me-2"></i> UPRAVIŤ PONUKU
-                                                    </a>
-                                                    <a href="{% url 'odstranit_inzerat' inzerat.id %}" class="btn btn-danger">Zmazať
-                                                        <i class="bi bi-trash"></i>
-                                                    </a>
+                                                    <a href="{% url 'upravit_inzerat' inzerat.pk %}" class="btn btn-warning flex-grow-1 text-dark fw-bold py-2 d-flex align-items-center justify-content-center"><i class="bi bi-pencil-square me-2"></i> UPRAVIŤ PONUKU</a>
+                                                    <a href="{% url 'odstranit_inzerat' inzerat.id %}" class="btn btn-danger">Zmazať <i class="bi bi-trash"></i></a>
                                                 </div>
                                             {% endif %}
                                         {% endif %}
@@ -172,13 +157,12 @@
                                 </div>
                             </div>
                         </div>
+
                     </div>
                 </div>
 
                 <div class="card-footer bg-dark p-3 border-top border-secondary text-center">
-                    <a href="{% url 'home' %}" class="btn btn-link text-white-50 text-decoration-none btn-sm">
-                        <i class="bi bi-arrow-left me-1"></i> Späť na všetky inzeráty
-                    </a>
+                    <a href="{% url 'home' %}" class="btn btn-link text-white-50 text-decoration-none btn-sm"><i class="bi bi-arrow-left me-1"></i> Späť na všetky inzeráty</a>
                 </div>
             </div>
         </div>
@@ -190,54 +174,6 @@
     <img class="overlay-content" id="fullImage">
 </div>
 
-<style>
-    .ebay-thumb-container { cursor: pointer; opacity: 0.7; transition: 0.2s; padding: 2px; border-radius: 6px; }
-    .ebay-thumb-box { width: 100px; height: 100px; display: flex; align-items: center; justify-content: center; overflow: hidden; border: 1px solid #495057; border-radius: 4px; }
-    .ebay-thumb-box img { max-width: 100%; max-height: 100%; object-fit: contain; }
-    .ebay-thumb-container.active { opacity: 1; }
-    .ebay-thumb-container.active .ebay-thumb-box { border: 2px solid #0dcaf0 !important; }
-    .photo-overlay { position: fixed; z-index: 9999; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.95); display: flex; align-items: center; justify-content: center; }
-    .overlay-content { max-width: 90%; max-height: 90%; border-radius: 4px; }
-    .close-overlay { position: absolute; top: 20px; right: 35px; color: #fff; font-size: 60px; font-weight: bold; cursor: pointer; }
-    
-    /* ZMENA: Zvýšená viditeľnosť šípok navigácie */
-    .custom-nav { width: 8%; opacity: 0.6; transition: 0.3s; }
-    .custom-nav:hover { opacity: 1; }
-    .carousel-control-prev-icon, .carousel-control-next-icon { background-color: rgba(0,0,0,0.5); border-radius: 50%; padding: 1.5rem; }
-</style>
-
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const thumbs = document.querySelectorAll('.ebay-thumb-container');
-    const carousel = document.getElementById('inzeratCarousel');
-    const overlay = document.getElementById('photoOverlay');
-    const fullImg = document.getElementById('fullImage');
-
-    function openPhotoOverlay(src) {
-        overlay.classList.remove('d-none');
-        overlay.classList.add('d-flex');
-        fullImg.src = src;
-        document.body.style.overflow = 'hidden';
-    }
-    function closePhotoOverlay() {
-        overlay.classList.add('d-none');
-        overlay.classList.remove('d-flex');
-        document.body.style.overflow = '';
-    }
-    if (carousel) {
-        carousel.addEventListener('slid.bs.carousel', function () {
-            const activeSlide = carousel.querySelector('.active');
-            let index = activeSlide.querySelector('img').getAttribute('data-img-index');
-            thumbs.forEach(t => t.classList.remove('active'));
-            if(thumbs[index]) thumbs[index].classList.add('active');
-        });
-    }
-    document.querySelectorAll('.open-overlay').forEach(img => {
-        img.onclick = () => openPhotoOverlay(img.src);
-    });
-    overlay.onclick = (e) => {
-        if(e.target !== fullImg) closePhotoOverlay();
-    };
-});
-</script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="{% static 'js/detail_inzeratu.js' %}"></script>
 {% endblock %}
