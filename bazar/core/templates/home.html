@@ -1,10 +1,11 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %} NOVU {% endblock %}
 
 {% block content %}
 
-<div class="card bg-dark border-secondary shadow-lg mb-5" style="border-radius: 15px; overflow: hidden;">
+<div class="card bg-dark border-secondary shadow-lg mb-5 filter-card">
     <div class="card-body p-4">
         <form method="GET" action="{% url 'home' %}" class="row g-3 align-items-end" id="filterForm">
             <div class="col-lg-3 col-md-12">
@@ -59,25 +60,20 @@
                     <span class="input-group-text bg-dark border-secondary text-white-50"><i class="bi bi-geo-alt"></i></span>
                     <input type="text" id="filter-lokalita" name="l" class="form-control bg-dark text-white border-secondary" 
                         placeholder="Mesto alebo PSČ" value="{{ request.GET.l|default:'' }}">
-                    <button type="button" class="btn btn-outline-info" onclick="zistitPolohuFiltra()">
+                    <button type="button" class="btn btn-outline-info" onclick="zistitPolohuFiltra(event)">
                         <i class="bi bi-geo-alt-fill"></i> Spresniť
                     </button>
                 </div>
             </div>
 
             <div class="col-lg-3 col-md-4">
-    <label class="form-label text-white-50 small">Okolie (km)</label>
-    <div class="input-group">
-        <input type="number" 
-               name="r" 
-               class="form-control bg-dark text-white border-secondary" 
-               placeholder="km" 
-               min="0" 
-               max="15000"
-               value="{{ request.GET.r|default:'' }}">
-        <span class="input-group-text bg-dark border-secondary text-white-50">km</span>
-    </div>
-</div>
+                <label class="form-label text-white-50 small">Okolie (km)</label>
+                <div class="input-group">
+                    <input type="number" name="r" class="form-control bg-dark text-white border-secondary" 
+                           placeholder="km" min="0" max="15000" value="{{ request.GET.r|default:'' }}">
+                    <span class="input-group-text bg-dark border-secondary text-white-50">km</span>
+                </div>
+            </div>
 
             <div class="col-lg-4 col-md-12 d-flex gap-2">
                 <button type="submit" class="btn btn-primary w-100 fw-bold">
@@ -98,12 +94,11 @@
 <div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 g-4">
     {% for inzerat in inzeraty %}
     <div class="col">
-        <div class="card h-100 shadow-sm border-secondary bg-dark text-white d-flex flex-column" style="border-radius: 12px; overflow: hidden; transition: transform 0.2s;">
+        <div class="card h-100 shadow-sm border-secondary bg-dark text-white d-flex flex-column inzerat-card">
             
-            <div class="image-container d-flex align-items-center justify-content-center" style="height: 280px; background-color: #212529; overflow: hidden;">
+            <div class="image-container d-flex align-items-center justify-content-center inzerat-img-container">
                 {% if inzerat.obrazok %}
-                    <img src="{{ inzerat.obrazok.url }}" class="w-100 h-100" alt="{{ inzerat.nazov }}" 
-                         style="object-fit: contain; object-position: center; padding: 5px;">
+                    <img src="{{ inzerat.obrazok.url }}" class="w-100 h-100" alt="{{ inzerat.nazov }}">
                 {% else %}
                     <i class="bi bi-image text-white-50" style="font-size: 3rem;"></i>
                 {% endif %}
@@ -111,21 +106,21 @@
 
             <div class="card-body d-flex flex-column p-3">
                 <div class="d-flex justify-content-between align-items-start mb-2">
-                    <h5 class="card-title text-truncate mb-0" style="max-width: 70%; font-size: 1rem;" title="{{ inzerat.nazov }}">{{ inzerat.nazov }}</h5>
+                    <h5 class="card-title text-truncate mb-0 inzerat-title" title="{{ inzerat.nazov }}">{{ inzerat.nazov }}</h5>
                     <span class="text-info fw-bold fs-6">{{ inzerat.cena }} €</span>
                 </div>
                 
                 <div class="mb-2 d-flex align-items-center flex-wrap gap-1">
-                    <span class="badge bg-secondary opacity-75 small" style="font-size: 0.7rem;">{{ inzerat.kategoria.nazov }}</span>
+                    <span class="badge bg-secondary opacity-75 small badge-small">{{ inzerat.kategoria.nazov }}</span>
                     
                     {% if inzerat.typ %}
-                    <span class="badge {% if inzerat.typ.nazov == 'Predaj' %}bg-primary{% else %}bg-warning text-dark{% endif %} small" style="font-size: 0.7rem;">
+                    <span class="badge {% if inzerat.typ.nazov == 'Predaj' %}bg-primary{% else %}bg-warning text-dark{% endif %} small badge-small">
                         {{ inzerat.typ.nazov }}
                     </span>
                     {% endif %}
 
                     {% if inzerat.lokalita %}
-                    <span class="badge bg-light text-dark small" style="font-size: 0.7rem; border-radius: 50px;">
+                    <span class="badge bg-light text-dark small badge-small badge-geo">
                         <i class="bi bi-geo-alt-fill me-1"></i>{{ inzerat.lokalita }}
                     </span>
                     {% endif %}
@@ -150,53 +145,6 @@
     {% endfor %}
 </div>
 
-<script>
-async function zistitPolohuFiltra() {
-    const input = document.getElementById('filter-lokalita');
-    const btn = event.currentTarget;
-    const form = document.getElementById('filterForm');
-
-    if (!navigator.geolocation) return;
-
-    // Uložíme si pôvodný obsah tlačidla
-    const povodnyObsah = btn.innerHTML;
-    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
-    
-    navigator.geolocation.getCurrentPosition(async (pos) => {
-        try {
-            const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${pos.coords.latitude}&lon=${pos.coords.longitude}`);
-            const data = await response.json();
-            
-            // Nominatim vrací adresu v objektu 'address'. 
-            // Skúsime postupne získať mesto, mesto-časť, obec alebo dedinu.
-            const a = data.address;
-            const mesto = a.city || a.town || a.village || a.hamlet || a.municipality || "";
-            
-            // Nastavíme len čistý názov mesta do inputu
-            input.value = mesto;
-            
-            // Odošleme formulár
-            form.submit(); 
-        } catch (e) {
-            console.error("Chyba pri získavaní polohy:", e);
-            btn.innerHTML = povodnyObsah;
-        }
-    }, (error) => {
-        alert("Nepodarilo sa získať GPS polohu. Skontrolujte povolenia v prehliadači.");
-        btn.innerHTML = povodnyObsah;
-    });
-}
-</script>
-
-<style>
-    .card:hover {
-        transform: translateY(-5px);
-        border-color: #0dcaf0 !important;
-        box-shadow: 0 10px 20px rgba(0,0,0,0.5) !important;
-    }
-    .input-group-text {
-        border-color: #495057 !important;
-    }
-</style>
+<script src="{% static 'js/home.js' %}"></script>
 
 {% endblock %}

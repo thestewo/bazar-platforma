@@ -1,7 +1,6 @@
 from django import forms
 from .models import Inzerat
 
-# Hľadaj v inzeraty/forms.py
 class InzeratForm(forms.ModelForm):
     class Meta:
         model = Inzerat
@@ -14,8 +13,17 @@ class InzeratForm(forms.ModelForm):
             'typ': 'Typ inzerátu',
             'obrazok': 'Fotografia produktu',
         }
+        widgets = {
+            'nazov': forms.TextInput(attrs={
+                'maxlength': '50',
+                'placeholder': 'Stručný názov (max. 50 znakov)'
+            }),
+        }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        for field in self.fields.values():
-            field.widget.attrs.update({'class': 'form-control bg-dark text-white border-secondary'})
+        for field_name, field in self.fields.items():
+            existing_classes = field.widget.attrs.get('class', '')
+            field.widget.attrs.update({
+                'class': f'{existing_classes} form-control bg-dark text-white border-secondary'.strip()
+            })

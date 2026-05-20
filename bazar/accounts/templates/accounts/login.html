@@ -1,5 +1,4 @@
 {% extends "base.html" %}
-
 {% block title %}Prihlásenie{% endblock %}
 
 {% block content %}
@@ -9,10 +8,13 @@
             <h2 class="text-center mb-4">Prihlásenie</h2>
             <form method="POST">
                 {% csrf_token %}
-                {% if form.non_field_errors %}
-                    {% for error in form.non_field_errors %}
-                        <div class="alert alert-danger">{{ error }}</div>
-                    {% endfor %}
+                
+                {% if form.errors %}
+                    <div class="alert alert-danger py-2 small">
+                        {% for field, errors in form.errors.items %}
+                            {% for error in errors %}{{ error }}<br>{% endfor %}
+                        {% endfor %}
+                    </div>
                 {% endif %}
 
                 <div class="mb-3">

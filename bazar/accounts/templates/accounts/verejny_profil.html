@@ -1,54 +1,44 @@
 {% extends "base.html" %}
-
-{% block content %}
+{% load static %} {% block content %}
 <div class="row mt-4 pb-5">
     <div class="col-md-4">
-        
         <div class="card bg-dark p-4 shadow-sm border-secondary text-white">
             <h3>{{ predajca.username }}</h3>
-            
             <div class="mb-2">
-                <span class="text-warning fs-5">
-                    <i class="bi bi-star-fill"></i> {{ priemer|default:"0" }}
-                </span>
+                <span class="text-warning fs-5"><i class="bi bi-star-fill"></i> {{ priemer|default:"0" }}</span>
                 <span class="text-muted small">({{ pocet_recenzii|default:"0" }} recenzií)</span>
             </div>
-
             <hr class="border-secondary">
 
-            {% if predajca.first_name %}
-            <p><strong>Meno:</strong> {{ predajca.first_name }}</p>
-            {% endif %}
-
-            {% if predajca.last_name %}
-            <p><strong>Priezvisko:</strong> {{ predajca.last_name }}</p>
-            {% endif %}
-
-            {% if predajca.profile.telefon %}
-                <p><strong>Telefón:</strong> {{ predajca.profile.telefon }}</p>
+            {% if predajca.first_name %}<p><strong>Meno:</strong> {{ predajca.first_name }}</p>{% endif %}
+            {% if predajca.last_name %}<p><strong>Priezvisko:</strong> {{ predajca.last_name }}</p>{% endif %}
+            {% if predajca.profile.telefon %}<p><strong>Telefón:</strong> {{ predajca.profile.telefon }}</p>{% endif %}
+            {% if predajca.profile.mesto %}<p><strong>Mesto:</strong> {{ predajca.profile.mesto }}</p>{% endif %}
+            {% if predajca.email %}
+                <p><strong>Email:</strong> <a href="mailto:{{ predajca.email }}" class="text-info">{{ predajca.email }}</a></p>
             {% endif %}
             
-            {% if predajca.profile.mesto %}
-                <p><strong>Mesto:</strong> {{ predajca.profile.mesto }}</p>
-            {% endif %}
-
-            {% if predajca.email %}
-            <p><strong>Email:</strong> <a href="mailto:{{ predajca.email }}" class="text-info">{{ predajca.email }}</a></p>
+            {% if user.is_authenticated and user != predajca %}
+                <hr class="border-secondary">
+                {% if uz_nahlasil %}
+                    <button class="btn btn-outline-secondary btn-sm w-100" disabled><i class="bi bi-check-all"></i> Už ste nahlásili</button>
+                {% else %}
+                    <button class="btn btn-outline-danger btn-sm w-100" data-bs-toggle="modal" data-bs-target="#reportModal">
+                        <i class="bi bi-exclamation-triangle"></i> Nahlásiť používateľa
+                    </button>
+                {% endif %}
             {% endif %}
         </div>
 
         <div class="mt-4 card p-3 shadow bg-dark text-white border-secondary">
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <h5 class="mb-0">Recenzie</h5>
-                
                 <div id="review-action-container">
                     {% if user.is_authenticated and user != predajca %}
                         {% if uz_hodnotil %}
                             <button class="btn btn-sm btn-secondary" disabled>Už ste hodnotili</button>
                         {% else %}
-                            <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#reviewModal">
-                                Pridať
-                            </button>
+                            <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#reviewModal">Pridať</button>
                         {% endif %}
                     {% elif user == predajca %}
                         <span class="badge bg-secondary">Váš profil</span>
@@ -57,9 +47,7 @@
             </div>
 
             <div class="dropdown mb-3">
-                <button class="btn btn-secondary btn-sm dropdown-toggle w-100 border-0" type="button" data-bs-toggle="dropdown" id="sortDropdown">
-                    Zoradiť podľa
-                </button>
+                <button class="btn btn-secondary btn-sm dropdown-toggle w-100 border-0" type="button" data-bs-toggle="dropdown" id="sortDropdown">Zoradiť podľa</button>
                 <ul class="dropdown-menu dropdown-menu-dark shadow w-100">
                     <li><a class="dropdown-item" href="javascript:void(0)" onclick="nacitajRecenzie('new')">Najnovšie</a></li>
                     <li><a class="dropdown-item" href="javascript:void(0)" onclick="nacitajRecenzie('old')">Najstaršie</a></li>
@@ -96,109 +84,8 @@
     </div>
 </div>
 
-<div class="modal fade" id="reviewModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content bg-dark text-white border-secondary">
-            <form id="addReviewForm" method="POST" action="{% url 'pridat_recenziu' predajca.id %}">
-                {% csrf_token %}
-                <div class="modal-header border-secondary">
-                    <h5 class="modal-title" id="modalTitle">Pridať recenziu</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body text-center">
-                    <div class="mb-3">
-                        <label class="form-label d-block text-muted small">Vaše hodnotenie</label>
-                        <div class="star-rating fs-2">
-                            <input type="radio" name="hviezdicky" value="5" id="s5" checked><label for="s5" class="bi bi-star-fill text-warning"></label>
-                            <input type="radio" name="hviezdicky" value="4" id="s4"><label for="s4" class="bi bi-star-fill text-warning"></label>
-                            <input type="radio" name="hviezdicky" value="3" id="s3"><label for="s3" class="bi bi-star-fill text-warning"></label>
-                            <input type="radio" name="hviezdicky" value="2" id="s2"><label for="s2" class="bi bi-star-fill text-warning"></label>
-                            <input type="radio" name="hviezdicky" value="1" id="s1"><label for="s1" class="bi bi-star-fill text-warning"></label>
-                        </div>
-                    </div>
-                    <textarea name="text" class="form-control bg-secondary text-white border-0" rows="4" placeholder="Napíš svoju skúsenosť..." required></textarea>
-                </div>
-                <div class="modal-footer border-secondary text-center">
-                    <button type="submit" class="btn btn-primary w-100 fw-bold">Odoslať recenziu</button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
+{% include 'accounts/includes/profil_modals.html' %}
 
-<style>
-    .star-rating { display: flex; flex-direction: row-reverse; justify-content: center; }
-    .star-rating input { display: none; }
-    .star-rating label { cursor: pointer; padding: 0 5px; opacity: 0.2; transition: 0.2s; }
-    .star-rating label:hover, .star-rating label:hover ~ label,
-    .star-rating input:checked ~ label { opacity: 1; }
+<script src="{% static 'js/profil.js' %}"></script>
 
-    #recenzie-list::-webkit-scrollbar { width: 6px; }
-    #recenzie-list::-webkit-scrollbar-track { background: #222; }
-    #recenzie-list::-webkit-scrollbar-thumb { background: #444; border-radius: 10px; }
-    #recenzie-list::-webkit-scrollbar-thumb:hover { background: #555; }
-</style>
-
-<script>
-function nacitajRecenzie(sortType) {
-    const url = window.location.pathname + '?sort=' + sortType;
-    fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-    .then(response => response.text())
-    .then(html => {
-        document.getElementById('recenzie-list').innerHTML = html;
-        window.history.pushState({}, '', url);
-    });
-}
-
-function zmazatRecenziu(id) {
-    // Odstránené potvrdenie - recenzia sa zmaže okamžite po kliknutí
-    fetch(`/accounts/recenzia/zmazat/${id}/`, {
-        headers: { 'X-Requested-With': 'XMLHttpRequest' }
-    })
-    .then(response => {
-        if (response.ok) {
-            // Reload stránky zabezpečí, že zmizne recenzia aj sa prepočíta priemer v karte
-            window.location.reload();
-        }
-    });
-}
-
-function pripravUpravu(hviezdicky, text) {
-    const modalEl = document.getElementById('reviewModal');
-    let modal = bootstrap.Modal.getInstance(modalEl);
-    if (!modal) { modal = new bootstrap.Modal(modalEl); }
-    
-    const form = document.getElementById('addReviewForm');
-    form.querySelector('textarea[name="text"]').value = text;
-    form.querySelector(`input[name="hviezdicky"][value="${hviezdicky}"]`).checked = true;
-    
-    document.getElementById('modalTitle').innerText = 'Upraviť moju recenziu';
-    modal.show();
-}
-
-const reviewForm = document.getElementById('addReviewForm');
-if (reviewForm) {
-    reviewForm.addEventListener('submit', function(e) {
-        e.preventDefault();
-        const formData = new FormData(this);
-        fetch(this.action, {
-            method: 'POST',
-            body: formData,
-            headers: { 'X-Requested-With': 'XMLHttpRequest' }
-        })
-        .then(response => {
-            if (response.ok) {
-                // Po úspešnom uložení/úprave reloadneme stránku, aby sa prepočítal priemer
-                window.location.reload();
-            } else {
-                alert("Chyba pri ukladaní.");
-            }
-        });
-    });
-}
-
-document.getElementById('reviewModal').addEventListener('hidden.bs.modal', function () {
-    document.getElementById('modalTitle').innerText = 'Pridať recenziu';
-});
-</script>
 {% endblock %}

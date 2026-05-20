@@ -22,7 +22,7 @@ class Typ(models.Model):
         verbose_name_plural = "Typy"
 
 class Inzerat(models.Model):
-    nazov = models.CharField(max_length=200)
+    nazov = models.CharField(max_length=50)
     popis = models.TextField()
     cena = models.DecimalField(max_digits=10, decimal_places=2)
     kategoria = models.ForeignKey(Kategoria, on_delete=models.SET_NULL, null=True, blank=True)
@@ -45,6 +45,7 @@ class Inzerat(models.Model):
         blank=True,
         null=True
     )
+    skryte_tagy = models.TextField(blank=True, null=True)
 
     def __str__(self):
         return self.nazov

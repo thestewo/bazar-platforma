@@ -1,0 +1,79 @@
+<div class="modal fade" id="reviewModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content bg-dark text-white border-secondary">
+            <form id="addReviewForm" method="POST" action="{% url 'pridat_recenziu' predajca.id %}">
+                {% csrf_token %}
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title" id="modalTitle">Pridať recenziu</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body text-center">
+                    <div class="mb-3">
+                        <label class="form-label d-block text-muted small">Vaše hodnotenie</label>
+                        <div class="star-rating fs-2">
+                            <input type="radio" name="hviezdicky" value="5" id="s5" checked><label for="s5" class="bi bi-star-fill text-warning"></label>
+                            <input type="radio" name="hviezdicky" value="4" id="s4"><label for="s4" class="bi bi-star-fill text-warning"></label>
+                            <input type="radio" name="hviezdicky" value="3" id="s3"><label for="s3" class="bi bi-star-fill text-warning"></label>
+                            <input type="radio" name="hviezdicky" value="2" id="s2"><label for="s2" class="bi bi-star-fill text-warning"></label>
+                            <input type="radio" name="hviezdicky" value="1" id="s1"><label for="s1" class="bi bi-star-fill text-warning"></label>
+                        </div>
+                    </div>
+                    <textarea name="text" class="form-control bg-dark text-white border-secondary" rows="4" placeholder="Napíš svoju skúsenosť..." required></textarea>
+                </div>
+                <div class="modal-footer border-secondary text-center">
+                    <button type="submit" class="btn btn-primary w-100 fw-bold">Odoslať recenziu</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="reportModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content bg-dark text-white border-danger">
+            <!-- 1. BLOK: FORMULÁR -->
+            <div id="reportFormContainer">
+                <form id="reportForm" method="POST" action="{% url 'nahlasit_pouzivatela' predajca.id %}">
+                    {% csrf_token %}
+                    <div class="modal-header border-secondary">
+                        <h5 class="modal-title text-danger">Nahlásiť používateľa {{ predajca.username }}</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label text-white-50 small">Dôvod nahlásenia</label>
+                            <select name="dovod" class="form-select bg-dark text-white border-secondary" required>
+                                <option value="" disabled selected>Vyberte dôvod...</option>
+                                <option value="podvod">Podvodný inzerát / Neodoslaný tovar</option>
+                                <option value="vulgarnost">Vulgárne správanie</option>
+                                <option value="spam">Spam / Reklama</option>
+                                <option value="ine">Iný dôvod</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label text-white-50 small">Bližší popis (nepovinné)</label>
+                            <textarea name="popis" class="form-control bg-dark text-white border-secondary" rows="3" placeholder="Uveďte detaily..."></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer border-secondary">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Zrušiť</button>
+                        <button type="submit" class="btn btn-danger">Odoslať nahlásenie</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- 2. BLOK: ĎAKOVNÁ SPRÁVA (predvolene skrytá) -->
+            <div id="reportSuccessMessage" style="display: none;">
+                <div class="modal-header border-0">
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body text-center pb-5">
+                    <i class="bi bi-check-circle text-success" style="font-size: 4rem;"></i>
+                    <h4 class="mt-3">Ďakujeme za nahlásenie</h4>
+                    <p class="text-muted">Vaše nahlásenie sme prijali a naši administrátori ho v krátkom čase preveria.</p>
+                    <button type="button" class="btn btn-outline-light mt-3" data-bs-dismiss="modal">Zatvoriť</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

@@ -21,29 +21,42 @@
         </button>
         <div class="collapse navbar-collapse" id="navbarNav">
           <ul class="navbar-nav ms-auto align-items-center">
+            
             <li class="nav-item dropdown">
-    <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
-        Kontakt
-    </a>
-    <ul class="dropdown-menu dropdown-menu-dark shadow border-secondary p-3" style="min-width: 200px;">
-        {% if kontakt %}
-            <li class="mb-2"><strong>{{ kontakt.meno }}</strong></li>
-            <li class="small text-muted">{{ kontakt.info_1 }}</li>
-            <li class="small text-muted">{{ kontakt.info_2 }}</li>
-        {% else %}
-            <li class="small">Kontakt nebol nastavený.</li>
-        {% endif %}
+              <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                  Kontakt
+              </a>
+              <ul class="dropdown-menu dropdown-menu-dark shadow border-secondary p-3" style="min-width: 240px;">
+                  {% if kontakt %}
+                      <li class="mb-1"><strong>{{ kontakt.meno }}</strong></li>
+                      <li class="small text-muted">{{ kontakt.info_1 }}</li>
+                      <li class="small text-muted mb-2">{{ kontakt.info_2 }}</li>
+                  {% else %}
+                      <li class="small mb-2">Kontakt nebol nastavený.</li>
+                  {% endif %}
 
-        {% if user.is_staff %}
-            <hr class="dropdown-divider">
-            <li>
-                <a class="btn btn-sm btn-outline-primary w-100" href="/admin/inzeraty/kontakt/">
-                    Upraviť (Admin)
-                </a>
+                  <hr class="dropdown-divider border-secondary">
+                  <li>
+                      <a class="btn btn-sm btn-info text-dark w-100 fw-bold d-flex align-items-center justify-content-center" href="#" data-bs-toggle="modal" data-bs-target="#ticketModal">
+                          <i class="bi bi-chat-square-text-fill me-2"></i> Návrhy a podpora
+                      </a>
+                  </li>
+
+                  {% if user.is_staff %}
+                      <hr class="dropdown-divider border-secondary">
+                      <li>
+                          <a class="btn btn-sm btn-outline-primary w-100" href="/admin/inzeraty/kontakt/">
+                              Upraviť kontakt (Admin)
+                          </a>
+                      </li>
+                      <li class="mt-1">
+                          <a class="btn btn-sm btn-outline-warning w-100" href="/admin/core/ticket/">
+                              Zobraziť tickety
+                          </a>
+                      </li>
+                  {% endif %}
+              </ul>
             </li>
-        {% endif %}
-    </ul>
-</li>
 
             {% if user.is_authenticated %}
               <li class="nav-item">
@@ -70,6 +83,7 @@
                     Odhlásiť sa ({{ user.username }})
                   </button>
                 </form>
+              </li>
             {% else %}
               <li class="nav-item">
                 <a class="nav-link" href="{% url 'login' %}">Prihlásiť sa</a>
@@ -78,16 +92,7 @@
                 <a class="btn btn-primary ms-lg-3" href="{% url 'register' %}">Registrácia</a>
               </li>
             {% endif %}
-              <li class="nav-item ms-lg-3">
-                <button id="music-toggle" class="btn btn-outline-secondary btn-sm d-flex align-items-center justify-content-center" 
-                        style="border-radius: 50%; width: 35px; height: 35px; padding: 0;">
-                    <i id="music-icon" class="bi bi-volume-mute"></i>
-                </button>
-              </li>
           </ul>
-          <audio id="bg-music" loop>
-            <source src="{% static 'audio/MC.mp3' %}" type="audio/mpeg">
-          </audio>
         </div>
       </div>
     </nav>
@@ -104,14 +109,22 @@
       {% block content %} {% endblock %}
     </div>
 
-    <footer class="py-4 mt-auto border-top border-secondary">
-    <div class="container text-center text-muted">
-        <p class="mb-0">
-            &copy; <span id="current-year"></span> Jakub Dzúr a Richard Mágyel. Všetky práva vyhradené.
-        </p>
-        <small>NOVU</small>
-    </div>
-    </footer>
+  <footer class="py-4 mt-auto border-top border-secondary">
+      <div class="container text-center text-muted">
+          <p class="mb-2">
+              &copy; <span id="current-year"></span> Jakub Dzúr a Richard Mágyel. Všetky práva vyhradené.
+          </p>
+          <div class="mb-2">
+              <a href="{% url 'vop' %}" class="text-muted text-decoration-none mx-2 small">Obchodné podmienky</a> | 
+              <a href="{% url 'gdpr' %}" class="text-muted text-decoration-none mx-2 small">GDPR</a> |
+              <a href="#" class="text-info text-decoration-none mx-2 small fw-bold" data-bs-toggle="modal" data-bs-target="#ticketModal">
+                <i class="bi bi-exclamation-circle-fill me-1"></i>Nahlásiť chybu / Návrh
+              </a>
+          </div>
+          <small class="d-block mt-2">NOVU</small>
+      </div>
+  </footer>
+
 
     <div class="modal fade" id="videoModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered modal-xl">
@@ -130,62 +143,133 @@
     </script>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
-      const music = document.getElementById('bg-music');
-      const btn = document.getElementById('music-toggle');
-      const icon = document.getElementById('music-icon');
 
-      music.volume = 1; 
+    <div class="modal fade" id="ticketModal" tabindex="-1" aria-labelledby="ticketModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content bg-dark text-white border-secondary shadow-lg" style="border-radius: 15px;">
+                <div class="modal-header border-bottom border-secondary bg-info bg-opacity-10 p-3">
+                    <h5 class="modal-title fw-bold text-info" id="ticketModalLabel">
+                        <i class="bi bi-chat-left-heart-fill me-2"></i>Návrhy, chyby a podpora
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form id="ticketForm" method="POST">
+                    {% csrf_token %}
+                    <div class="modal-body p-4">
+                        {% if not user.is_authenticated %}
+                        <div class="mb-3">
+                            <label for="ticketEmail" class="form-label text-white-50 small">Váš Email</label>
+                            <input type="email" name="email" id="ticketEmail" class="form-control bg-dark text-white border-secondary" placeholder="meno@priklad.sk" required>
+                        </div>
+                        {% endif %}
 
-      function updateIcon(isPlaying) {
-          if (isPlaying) {
-              icon.classList.replace('bi-volume-mute', 'bi-volume-up');
-              btn.classList.add('text-primary', 'border-primary');
-          } else {
-              icon.classList.replace('bi-volume-up', 'bi-volume-mute');
-              btn.classList.remove('text-primary', 'border-primary');
-          }
-      }
+                        <div class="mb-3">
+                            <label for="ticketTyp" class="form-label text-white-50 small">Typ správy</label>
+                            <select name="typ" id="ticketTyp" class="form-select bg-dark text-white border-secondary">
+                                <option value="navrh">Návrh / Vylepšenie</option>
+                                <option value="chyba">Nahlásenie chyby</option>
+                                <option value="otazka">Všeobecná otázka</option>
+                            </select>
+                        </div>
 
-      function toggleMusic() {
-          if (music.paused) {
-              music.play();
-              localStorage.setItem('musicStatus', 'playing');
-              updateIcon(true);
-          } else {
-              music.pause();
-              localStorage.setItem('musicStatus', 'paused');
-              updateIcon(false);
-          }
-      }
+                        <div class="mb-3">
+                            <label for="ticketPredmet" class="form-label text-white-50 small">Predmet</label>
+                            <input type="text" name="predmet" id="ticketPredmet" class="form-control bg-dark text-white border-secondary" placeholder="Stručný názov" maxlength="150" required>
+                        </div>
 
-      btn.addEventListener('click', toggleMusic);
-      window.addEventListener('click', () => {
-          if (localStorage.getItem('musicStatus') !== 'paused' && music.paused) {
-              music.play().then(() => {
-                  updateIcon(true);
-              }).catch(e => console.log("Autoplay blokovaný"));
-          }
-      }, { once: true });
+                        <div class="mb-3">
+                            <label for="ticketSprava" class="form-label text-white-50 small">Vaša správa</label>
+                            <textarea name="sprava" id="ticketSprava" rows="4" class="form-control bg-dark text-white border-secondary" placeholder="Popíšte nám váš nápad alebo chybu, ktorú ste našli..." required></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer border-top border-secondary p-3">
+                        <button type="button" class="btn btn-outline-secondary px-4" data-bs-dismiss="modal">Zrušiť</button>
+                        <button type="submit" id="ticketSubmitBtn" class="btn btn-info text-dark fw-bold px-4 shadow">
+                            <span id="ticketBtnText">Odoslať</span>
+                            <span id="ticketBtnSpinner" class="spinner-border spinner-border-sm d-none" role="status"></span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 
-      if (localStorage.getItem('musicStatus') === 'playing') {
-          updateIcon(true);
-      }
 
-      function otvorVideo(url) {
-          const modalVid = document.getElementById('modalVideo');
-          modalVid.src = url;
-          const myModal = new bootstrap.Modal(document.getElementById('videoModal'));
-          myModal.show();
-          modalVid.play();
-      }
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const form = document.getElementById('ticketForm');
+    
+    // Ochrana: Ak by skript náhodou nenašiel formulár, vypíše chybu do konzoly (F12)
+    if (!form) {
+        console.error("TicketForm sa nenašiel! Skontroluj, či má formulár id='ticketForm'");
+        return;
+    }
 
-      function stopVideo() {
-          const modalVid = document.getElementById('modalVideo');
-          if (modalVid) {
-              modalVid.pause();
-          }
-      }
-    </script>
+    form.addEventListener('submit', function(e) {
+        // Tieto dva riadky MUSIA byť úplne navrchu a bezchybné
+        e.preventDefault();
+        e.stopPropagation();
+
+        const btn = document.getElementById('ticketSubmitBtn');
+        const text = document.getElementById('ticketBtnText');
+        const spinner = document.getElementById('ticketBtnSpinner');
+        
+        // Získanie inštancie modalu pomocou Bootstrapu
+        const modalElement = document.getElementById('ticketModal');
+        const bootstrapModal = bootstrap.Modal.getInstance(modalElement);
+
+        const formData = new FormData(this);
+
+        // Vizuálny stav odosielania
+        if (btn) btn.disabled = true;
+        if (text) text.innerText = "Odosielam...";
+        if (spinner) spinner.classList.remove('d-none');
+
+        // URL adresu na view vygenerujeme priamo tu
+        fetch("/ticket/novy/", {
+            method: 'POST',
+            body: formData,
+            headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+        })
+        .then(response => {
+            if (response.ok) {
+                this.reset(); // Vyčistí polia formulára
+                
+                if (bootstrapModal) {
+                    bootstrapModal.hide(); // Zavrie vyskakovacie okno
+                }
+
+                // RIEŠENIE B: Vloženie Django-like úspešnej správy priamo do stránky
+                const alertHtml = `
+                    <div class="alert alert-success alert-dismissible fade show" role="alert">
+                        Ďakujeme za správu! Váš podnet sme zaznamenali.
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                `;
+
+                const container = document.querySelector('.content-wrapper');
+                if (container) {
+                    container.insertAdjacentHTML('afterbegin', alertHtml);
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                }
+            } else {
+                alert("Nastala chyba pri spracovaní na serveri (Kód " + response.status + ").");
+            }
+        })
+        .catch(err => {
+            console.error("Chyba siete:", err);
+            alert("Nepodarilo sa spojiť so serverom. Skontrolujte pripojenie.");
+        })
+        .finally(() => {
+            // Vrátenie tlačidla do pôvodného stavu pri akomkoľvek výsledku
+            if (btn) btn.disabled = false;
+            if (text) text.innerText = "Odoslať";
+            if (spinner) spinner.classList.add('d-none');
+        });
+    });
+});
+</script>
+
+
   </body>
 </html>

@@ -6,20 +6,17 @@
 {% block content %}
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
 
-{% if inzerat %}
-    <script id="existing-photos-data" type="application/json">
-        [
-            {% if inzerat.obrazok %}"{{ inzerat.obrazok.url }}"{% endif %}
-            {% if inzerat.obrazok and inzerat.dodatocne_obrazky.all %},{% endif %}
+<script id="existing-photos-data" type="application/json">
+    [
+        {% if inzerat and inzerat.obrazok %}"{{ inzerat.obrazok.url }}"{% endif %}
+        {% if inzerat and inzerat.obrazok and inzerat.dodatocne_obrazky.all %},{% endif %}
+        {% if inzerat %}
             {% for foto in inzerat.dodatocne_obrazky.all %}
                 "{{ foto.obrazok.url }}"{% if not forloop.last %},{% endif %}
             {% endfor %}
-        ]
-    </script>
-{% else %}
-    <script id="existing-photos-data" type="application/json">[]</script>
-{% endif %}
-
+        {% endif %}
+    ]
+</script>
 
 <div class="row justify-content-center mt-5">
     <div class="col-lg-8 col-md-10">
@@ -42,6 +39,7 @@
                         <div class="col-md-8 mb-3">
                             <label class="form-label fw-bold text-info">Názov inzerátu</label>
                             {{ form.nazov }}
+                            <small class="text-muted">Zostáva znakov: <span id="char-count">50</span></small>
                         </div>
                         
                         <div class="col-md-4 mb-3">
@@ -63,7 +61,6 @@
                             <label class="form-label fw-bold text-info">Kategória</label>
                             {{ form.kategoria }}
                         </div>
-
                         <div class="col-md-6 mb-3">
                             <label class="form-label fw-bold text-info">Typ inzerátu</label>
                             {{ form.typ }}
@@ -72,23 +69,19 @@
 
                     <div class="mb-3">
                         <label class="form-label fw-bold text-info">Lokalita</label>
-                    <div class="input-group">
-                     <input type="text" id="lokalita-input" name="lokalita" 
-                        class="form-control bg-secondary text-white border-secondary" 
-                            value="{% if inzerat %}{{ inzerat.lokalita }}{% else %}{{ odhad_lokality|default:'' }}{% endif %}" 
-                                placeholder="Mesto alebo obec">
-                        <button type="button" class="btn btn-outline-info" onclick="spresnitPolohu()">
-                        <i class="bi bi-geo-alt-fill"></i> Spresniť
-                        </button>
-                    </div>
+                        <div class="input-group">
+                            <input type="text" id="lokalita-input" name="lokalita" class="form-control bg-secondary text-white border-secondary" value="{% if inzerat %}{{ inzerat.lokalita }}{% else %}{{ odhad_lokality|default:'' }}{% endif %}" placeholder="Mesto alebo obec">
+                            <button type="button" class="btn btn-outline-info" onclick="spresnitPolohu()">
+                                <i class="bi bi-geo-alt-fill"></i> Spresniť
+                            </button>
+                        </div>
                         <small class="text-white-50" id="status-polohy">
-                            {% if inzerat %}Aktuálne nastavená lokalita.{% else %}Predvolený odhad podľa vašej siete.{% endif %}
+                            {% if inzerat %}Aktuálne nastavená lokalita.{% else %}Predvolený odhad podľa vašej sieci.{% endif %}
                         </small>
                     </div>
 
                     <div class="mb-4">
                         <label class="form-label fw-bold text-info">Fotografie (Prvá bude hlavná)</label>
-                        
                         <div id="dropZone" class="p-4 border border-secondary border-dashed rounded bg-black bg-opacity-25 text-center transition-all" style="cursor: pointer;">
                             <input type="file" id="imageInput" accept="image/*" class="d-none" multiple>
                             
@@ -101,17 +94,16 @@
                             </div>
                             
                             <div id="photoCount" class="small mb-3 text-white-50">0 / 10 fotografií</div>
-                            
-                            <div id="previews" class="d-flex flex-wrap gap-3 justify-content-center" 
-                            data-existing-photos="{% if inzerat %}{% for foto in inzerat.fotografie.all %}{{ foto.image.url }}{% if not forloop.last %},{% endif %}{% endfor %}{% endif %}">
+                            <div id="previews" class="d-flex flex-wrap gap-3 justify-content-center"></div>
                         </div>
                         <small class="text-white-50 mt-2 d-block text-center">Maximálne 10 fotografií. Podporuje Drag & Drop, Copy-Paste a vlastný orez.</small>
                     </div>
 
                     <div class="d-flex justify-content-between align-items-center mt-5">
                         <a href="{% if inzerat %}{% url 'detail_inzeratu' inzerat.pk %}{% else %}{% url 'home' %}{% endif %}" class="btn btn-outline-secondary px-4 text-white text-decoration-none">Zrušiť</a>
-                        <button type="submit" class="btn {% if inzerat %}btn-warning{% else %}btn-success{% endif %} btn-lg px-5 fw-bold shadow">
-                            <i class="bi bi-check-lg me-1"></i> Uložiť inzerát
+                        <button type="submit" id="submit-btn" class="btn {% if inzerat %}btn-warning{% else %}btn-success{% endif %} btn-lg px-5 fw-bold shadow">
+                            <span id="btn-text"><i class="bi bi-check-lg me-1"></i> {% if inzerat %}Uložiť zmeny{% else %}Uložiť inzerát{% endif %}</span>
+                            <span id="btn-spinner" class="spinner-border spinner-border-sm d-none" role="status"></span>
                         </button>
                     </div>
                 </form>
@@ -139,265 +131,5 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
-<script>
-    // DOPLNENÁ FUNKCIA: GEOLOKALIZÁCIA
-    function spresnitPolohu() {
-        const statusText = document.getElementById('status-polohy');
-        const inputPoloha = document.getElementById('lokalita-input');
-
-        if (!navigator.geolocation) {
-            alert("Váš prehliadač nepodporuje geolokalizáciu.");
-            return;
-        }
-
-        statusText.innerText = "Zisťujem polohu...";
-
-        navigator.geolocation.getCurrentPosition(
-            async (position) => {
-                const lat = position.coords.latitude;
-                const lon = position.coords.longitude;
-
-                try {
-                    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`);
-                    const data = await res.json();
-                    const mesto = data.address.city || data.address.town || data.address.village || "";
-                    inputPoloha.value = mesto;
-                    statusText.innerText = "Poloha spresnená.";
-                } catch (e) {
-                    statusText.innerText = "Chyba pri získavaní názvu.";
-                }
-            },
-            () => { statusText.innerText = "Prístup zamietnutý."; }
-        );
-    }
-
-    let cropper;
-    let croppedBlobs = [];
-    const MAX_PHOTOS = 10;
-    
-    const imageInput = document.getElementById('imageInput');
-    const previews = document.getElementById('previews');
-    const cropModal = document.getElementById('cropModal');
-    const imageToCrop = document.getElementById('imageToCrop');
-    const photoCountDisplay = document.getElementById('photoCount');
-    const uploadBtn = document.getElementById('uploadBtn');
-    const dropZone = document.getElementById('dropZone');
-    let pendingFiles = [];
-
-    // --- 1. INICIALIZÁCIA EXISTUJÚCICH FOTIEK PRI ÚPRAVE ---
-    document.addEventListener('DOMContentLoaded', function() {
-    const dataElement = document.getElementById('existing-photos-data');
-    if (!dataElement) return;
-
-    try {
-        const existingPhotos = JSON.parse(dataElement.textContent);
-        
-        const validPhotos = existingPhotos.filter(url => url && url.trim() !== "");
-
-        validPhotos.forEach((url, index) => {
-            fetch(url)
-                .then(res => {
-                    if (!res.ok) throw new Error('Foto sa nepodarilo stiahnuť');
-                    return res.blob();
-                })
-                .then(blob => {
-                    const fileName = url.split('/').pop() || `povodna_foto_${index}.jpg`;
-                    const file = new File([blob], fileName, { type: blob.type });
-                    
-                    croppedBlobs.push(file);
-                    renderPreviews();
-                    updateInterface();
-                })
-                .catch(err => console.error("Chyba pri načítaní existujúcej fotky:", url, err));
-        });
-    } catch (e) {
-        console.error("Chyba pri spracovaní JSON dát:", e);
-    }
-    });
-
-    // --- 2. LOGIKA PRE DRAG & DROP A PASTE ---
-    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-        dropZone.addEventListener(eventName, e => { e.preventDefault(); e.stopPropagation(); }, false);
-    });
-
-    ['dragenter', 'dragover'].forEach(eventName => {
-        dropZone.addEventListener(eventName, () => dropZone.classList.add('border-info', 'bg-info', 'bg-opacity-10'), false);
-    });
-
-    ['dragleave', 'drop'].forEach(eventName => {
-        dropZone.addEventListener(eventName, () => dropZone.classList.remove('border-info', 'bg-info', 'bg-opacity-10'), false);
-    });
-
-    dropZone.addEventListener('drop', e => handleFiles(e.dataTransfer.files));
-    imageInput.addEventListener('change', e => handleFiles(e.target.files));
-    
-    window.addEventListener('paste', e => {
-        if (e.clipboardData.files.length > 0) handleFiles(e.clipboardData.files);
-    });
-
-    function handleFiles(files) {
-        const availableSlots = MAX_PHOTOS - croppedBlobs.length;
-        if (availableSlots <= 0) {
-            alert("Dosiahli ste maximálny limit 10 fotografií.");
-            return;
-        }
-
-        let selectedFiles = Array.from(files).filter(file => file.type.startsWith('image/'));
-        if (selectedFiles.length > availableSlots) {
-            alert(`Môžete pridať už len ${availableSlots} fotiek.`);
-            selectedFiles = selectedFiles.slice(0, availableSlots);
-        }
-
-        pendingFiles = [...pendingFiles, ...selectedFiles];
-        if (cropModal.classList.contains('d-none')) processNextFile();
-    }
-
-    // --- 3. OREZÁVANIE (CROPPER) ---
-    function processNextFile() {
-        if (pendingFiles.length === 0) {
-            imageInput.value = "";
-            return;
-        }
-
-        const file = pendingFiles.shift();
-        const reader = new FileReader();
-        reader.onload = function(event) {
-            imageToCrop.src = event.target.result;
-            cropModal.classList.remove('d-none');
-            
-            if (cropper) cropper.destroy();
-            cropper = new Cropper(imageToCrop, {
-                aspectRatio: NaN,
-                viewMode: 1,
-                autoCropArea: 1,
-                dragMode: 'move',
-                restore: false,
-                guides: true,
-                center: true,
-                cropBoxMovable: true,
-                cropBoxResizable: true,
-                toggleDragModeOnDblclick: false,
-            });
-        };
-        reader.readAsDataURL(file);
-    }
-
-    document.getElementById('selectAllBtn').addEventListener('click', () => {
-        cropper.setCropBoxData({
-            left: 0, top: 0,
-            width: cropper.getContainerData().width,
-            height: cropper.getContainerData().height
-        });
-    });
-
-    document.getElementById('saveCrop').addEventListener('click', () => {
-        const canvas = cropper.getCroppedCanvas({ maxWidth: 1200 });
-        canvas.toBlob(blob => {
-            const file = new File([blob], `img_${Date.now()}.jpg`, { type: "image/jpeg" });
-            croppedBlobs.push(file);
-            renderPreviews();
-            updateInterface();
-            cropModal.classList.add('d-none');
-            processNextFile();
-        }, 'image/jpeg', 0.9);
-    });
-
-    document.getElementById('cancelCrop').addEventListener('click', () => {
-        cropModal.classList.add('d-none');
-        processNextFile();
-    });
-
-    // --- 4. RENDER A ROZHRANIE ---
-    function renderPreviews() {
-        previews.innerHTML = "";
-        croppedBlobs.forEach((file, index) => {
-            const url = URL.createObjectURL(file);
-            const div = document.createElement('div');
-            div.className = "position-relative m-1";
-            div.innerHTML = `
-                <img src="${url}" class="rounded border border-info shadow-sm" style="width: 120px; height: 100px; object-fit: contain; background: #000;">
-                <button type="button" class="btn btn-danger btn-sm position-absolute top-0 end-0 rounded-circle" 
-                        style="transform: translate(30%, -30%); width: 25px; height: 25px; line-height: 1;" 
-                        onclick="removePhoto(${index}, event)">&times;</button>
-            `;
-            previews.appendChild(div);
-        });
-    }
-
-    function updateInterface() {
-        const count = croppedBlobs.length;
-        photoCountDisplay.innerText = `${count} / ${MAX_PHOTOS} fotografií`;
-        if (count >= MAX_PHOTOS) {
-            photoCountDisplay.classList.replace('text-white-50', 'text-danger');
-            uploadBtn.disabled = true;
-        } else {
-            photoCountDisplay.classList.replace('text-danger', 'text-white-50');
-            uploadBtn.disabled = false;
-        }
-    }
-
-    function removePhoto(index, event) {
-        event.stopPropagation();
-        croppedBlobs.splice(index, 1);
-        renderPreviews();
-        updateInterface();
-    }
-
-    // --- 5. ODOSLANIE FORMY ---
-    document.getElementById('inzeratForm').onsubmit = function(e) {
-    e.preventDefault();
-    
-    const nextUrl = this.getAttribute('data-next-url');
-
-    if (croppedBlobs.length === 0) {
-        alert("Pridajte aspoň jednu fotografiu.");
-        return;
-    }
-
-    let formData = new FormData(this);
-    formData.delete('dodatocne_obrazky'); 
-    
-    croppedBlobs.forEach((file, index) => {
-        formData.append('dodatocne_obrazky', file, file.name || `foto_${index}.jpg`);
-    });
-
-    fetch(window.location.href, {
-        method: 'POST',
-        body: formData,
-        headers: { 'X-CSRFToken': '{{ csrf_token }}' }
-    })
-    .then(async response => {
-        if (response.ok) {
-            window.location.href = nextUrl;
-        } else {
-            const errorText = await response.text();
-            console.error("Server vrátil chybu:", errorText);
-            alert("Chyba pri ukladaní.");
-        }
-    })
-    .catch(err => {
-        console.error("Chyba siete:", err);
-    });
-    };
-</script>
-
-<style>
-    .border-dashed { border-style: dashed !important; border-width: 2px !important; }
-    .transition-all { transition: all 0.2s ease-in-out; }
-    #previews img { border-width: 2px !important; transition: all 0.3s ease; }
-    #previews img:hover { transform: translateY(-5px); border-color: #0dcaf0 !important; }
-    
-    .form-control, .form-select { 
-        background-color: rgba(255,255,255,0.05) !important; 
-        border: 1px solid #495057 !important; 
-        color: white !important; 
-    }
-    
-    .form-control:focus, .form-select:focus { 
-        border-color: #0dcaf0 !important; 
-        box-shadow: none !important; 
-        background-color: #2b3035 !important;
-    }
-    .cropper-container { max-width: 100% !important; }
-</style>
+<script src="{% static 'js/pridat_inzerat.js' %}"></script>
 {% endblock %}

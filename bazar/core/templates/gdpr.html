@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container my-5" style="font-size: 0.85rem;">
+    <div class="row justify-content-center">
+        <div class="col-md-11 bg-dark text-white p-5 rounded shadow border-start border-success border-5">
+            <h1 class="h3 mb-4 text-uppercase fw-bold text-success border-bottom border-secondary pb-3">Informačné memorandum o spracúvaní osobných údajov (GDPR)</h1>
+            
+            <h6 class="fw-bold mt-4">I. PRÁVNY RÁMEC A IDENTIFIKÁCIA PREVÁDZKOVATEĽA</h6>
+            <p>Spracúvanie osobných údajov subjektov údajov (Používateľov) prebieha v súlade s Nariadením Európskeho parlamentu a Rady (EÚ) 2016/679 (ďalej len „Nariadenie“) a zákonom č. 18/2018 Z. z. o ochrane osobných údajov. Správcom údajov pre účely Portálu Novu je Prevádzkovateľ.</p>
+
+            <h6 class="fw-bold mt-4">II. PRÁVNY ZÁKLAD A ÚČELOVOSŤ SPRACÚVANIA</h6>
+            <p>Osobné údaje sú spracúvané na základe nasledovných právnych titulov:<br>
+            a) <strong>Plnenie zmluvy (Čl. 6 ods. 1 písm. b Nariadenia):</strong> Nevyhnutné pre vedenie používateľského účtu a uverejnenie inzerátov.<br>
+            b) <strong>Oprávnený záujem (Čl. 6 ods. 1 písm. f Nariadenia):</strong> Prevencia podvodného konania, ochrana majetku Prevádzkovateľa a iných Používateľov, evidencia nahlásení (Incident Management).<br>
+            c) <strong>Súhlas (Čl. 6 ods. 1 písm. a Nariadenia):</strong> V prípade odberu marketingových komunikátov a ukladania analytických cookies.</p>
+
+            <h6 class="fw-bold mt-4">III. KATEGORIZÁCIA SPRACÚVANÝCH ÚDAJOV</h6>
+            <p>Prevádzkovateľ zhromažďuje nasledujúce kategórie dát:<br>
+            - **Priame údaje:** Meno, priezvisko (ak je uvedené), e-mailová adresa, MSISDN (telefónne číslo).<br>
+            - **Technické artefakty:** Unikátny identifikátor zariadenia, IP adresa, User-Agent reťazec prehliadača, údaje o interakcii s rozhraním (Clickstream dáta).</p>
+
+            <h6 class="fw-bold mt-4">IV. PROFILOVANIE A AUTOMATIZOVANÉ ROZHODOVANIE</h6>
+            <p>Prevádzkovateľ si vyhradzuje právo na limitované profilovanie používateľov za účelom detekcie anomálneho správania, ktoré vykazuje znaky kybernetickej kriminality alebo hromadného spamu (automatizované filtrovanie Obsahu).</p>
+
+            <h6 class="fw-bold mt-4">V. PRÁVA SUBJEKTU ÚDAJOV A PRÁVO NA NÁMIETKU</h6>
+            <p>Používateľ má právo požadovať potvrdenie o spracúvaní, právo na prenosnosť údajov k inému prevádzkovateľovi a právo na výmaz (právo na zabudnutie). V prípade spracúvania na základe oprávneného záujmu má Používateľ právo kedykoľvek namietať proti takémuto spracúvaniu. Žiadosti zasielajte na korešpondenčnú adresu Prevádzkovateľa.</p>
+            
+            <div class="mt-4 p-3 bg-secondary bg-opacity-10 text-muted border border-secondary">
+                Tento dokument je pravidelne revidovaný. Aktuálna verzia nadobúda platnosť momentom zverejnenia v rozhraní Portálu Novu.
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
