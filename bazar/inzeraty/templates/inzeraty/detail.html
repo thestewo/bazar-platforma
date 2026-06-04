@@ -130,11 +130,29 @@
                             
                             <div class="col-md-4 border-end border-secondary d-flex flex-column justify-content-center h-100 px-4">
                                 <span class="text-white-50 small d-block text-uppercase mb-2" style="font-size: 0.7rem;">Predajca</span>
-                                <div class="d-flex align-items-center gap-3">
-                                    <div class="bg-info rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; min-width: 32px;">
-                                        <i class="bi bi-person-fill text-dark fs-6"></i>
+                                <div class="d-flex align-items-center justify-content-between gap-3">
+                                    <div class="d-flex align-items-center gap-3">
+                                        <div class="bg-info rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; min-width: 32px;">
+                                            <i class="bi bi-person-fill text-dark fs-6"></i>
+                                        </div>
+                                        
+                                        <div class="d-flex align-items-center gap-2">
+                                            <a href="{% url 'verejny_profil' inzerat.autor.username %}" class="text-info text-decoration-none fw-bold text-truncate fs-6">{{ inzerat.autor.username }}</a>
+                                            
+                                            {% if inzerat.autor.profile.je_rizikovy %}
+                                                <i class="bi bi-exclamation-triangle-fill text-warning fs-6" 
+                                                style="cursor: help;" 
+                                                title="Upozornenie: Tento používateľ bol viackrát nahlásený komunitou za porušenie pravidiel. Zvýšte opatrnosť!"></i>
+                                            {% endif %}
+                                        </div>
                                     </div>
-                                    <a href="{% url 'verejny_profil' inzerat.autor.username %}" class="text-info text-decoration-none fw-bold text-truncate fs-6">{{ inzerat.autor.username }}</a>
+                                    
+                                    {% if user.is_authenticated and user != inzerat.autor %}
+                                        <button class="btn btn-sm btn-outline-danger border-0 d-flex align-items-center gap-1 px-2 py-1" data-bs-toggle="modal" data-bs-target="#reportModal" title="Nahlásiť inzerát">
+                                            <i class="bi bi-flag-fill"></i>
+                                            <span style="font-size: 0.8rem; font-weight: 500;">Nahlásiť inzerát</span>
+                                        </button>
+                                    {% endif %}
                                 </div>
                             </div>
 
@@ -176,4 +194,77 @@
 
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script src="{% static 'js/detail_inzeratu.js' %}"></script>
+<div class="modal fade" id="reportModal" tabindex="-1" aria-labelledby="reportModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content bg-dark text-white border-secondary">
+            <div class="modal-header border-secondary bg-danger bg-opacity-10">
+                <h5 class="modal-title fw-bold text-danger" id="reportModalLabel"><i class="bi bi-exclamation-octagon me-2"></i>Nahlásiť inzerát</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-with="modal" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="reportForm" action="{% url 'nahlasit_inzerat' inzerat.pk %}">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label text-white-50 small">Dôvod nahlásenia</label>
+                        <select name="dovod" class="form-select bg-dark text-white border-secondary" required>
+                            <option value="" selected disabled>Vyberte dôvod...</option>
+                            <option value="podvod">Podvodný inzerát / Neodoslaný tovar</option>
+                            <option value="vulgarnost">Vulgárny alebo nevhodný obsah</option>
+                            <option value="spam">Spam / Duplicitný inzerát</option>
+                            <option value="ine">Iný dôvod</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label text-white-50 small">Bližšie informácie (nepovinné)</label>
+                        <textarea name="popis" class="form-control bg-dark text-white border-secondary" rows="3" placeholder="Popíšte, čo presne je s inzerátom v neporiadku..."></textarea>
+                    </div>
+                    <div id="report-error" class="alert alert-danger d-none small p-2"></div>
+                </div>
+                <div class="modal-footer border-secondary">
+                    <button type="button" class="btn btn-outline-secondary text-white btn-sm px-3" data-bs-dismiss="modal">Zrušiť</button>
+                    <button type="submit" class="btn btn-danger btn-sm px-4 fw-bold">Odoslať nahlásenie</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('reportForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const form = this;
+    const errorDiv = document.getElementById('report-error');
+    const formData = new FormData(form);
+
+    errorDiv.classList.add('d-none');
+
+    try {
+        const response = await fetch(form.action, {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': formData.get('csrfmiddlewaretoken')
+            }
+        });
+        
+        const data = await response.json();
+
+        if (response.ok) {
+            alert(data.success);
+            // Schováme modal a vyčistíme formulár
+            const modalEl = document.getElementById('reportModal');
+            const modal = bootstrap.Modal.getInstance(modalEl);
+            modal.hide();
+            form.reset();
+        } else {
+            errorDiv.innerText = data.error || "Nastala chyba.";
+            errorDiv.classList.remove('d-none');
+        }
+    } catch (err) {
+        console.error("Chyba:", err);
+        errorDiv.innerText = "Chyba spojenia so serverom.";
+        errorDiv.classList.remove('d-none');
+    }
+});
+</script>
 {% endblock %}

@@ -3,7 +3,16 @@
 <div class="row mt-4 pb-5">
     <div class="col-md-4">
         <div class="card bg-dark p-4 shadow-sm border-secondary text-white">
-            <h3>{{ predajca.username }}</h3>
+            <div class="d-flex align-items-center gap-2 mb-2">
+                <h3>{{ predajca.username }}</h3>
+                {% if predajca.profile.je_rizikovy %}
+                    <i class="bi bi-exclamation-triangle-fill text-warning fs-4" 
+                    style="cursor: help;" 
+                    title="Upozornenie: Tento používateľ bol viackrát nahlásený komunitou za porušenie pravidiel. Zvýšte opatrnosť!"></i>
+                {% endif %}
+            </div>
+
+
             <div class="mb-2">
                 <span class="text-warning fs-5"><i class="bi bi-star-fill"></i> {{ priemer|default:"0" }}</span>
                 <span class="text-muted small">({{ pocet_recenzii|default:"0" }} recenzií)</span>
@@ -21,10 +30,16 @@
             {% if user.is_authenticated and user != predajca %}
                 <hr class="border-secondary">
                 {% if uz_nahlasil %}
-                    <button class="btn btn-outline-secondary btn-sm w-100" disabled><i class="bi bi-check-all"></i> Už ste nahlásili</button>
+                    <button class="btn btn-outline-secondary btn-sm w-100 py-2 d-flex align-items-center justify-content-center gap-2" disabled>
+                        <i class="bi bi-check-all fs-5"></i> Už ste nahlásili
+                    </button>
                 {% else %}
-                    <button class="btn btn-outline-danger btn-sm w-100" data-bs-toggle="modal" data-bs-target="#reportModal">
-                        <i class="bi bi-exclamation-triangle"></i> Nahlásiť používateľa
+                    <button class="btn btn-sm btn-outline-danger w-100 py-2 d-flex align-items-center justify-content-center gap-2 fw-medium" 
+                            data-bs-toggle="modal" 
+                            data-bs-target="#reportModal" 
+                            title="Nahlásiť používateľa">
+                        <i class="bi bi-flag-fill"></i>
+                        <span style="font-size: 0.9rem;">Nahlásiť</span>
                     </button>
                 {% endif %}
             {% endif %}

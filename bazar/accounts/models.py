@@ -2,6 +2,7 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+from inzeraty.models import Inzerat
 
 class Profile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
@@ -10,6 +11,20 @@ class Profile(models.Model):
 
     def __str__(self):
         return f'Profil používateľa {self.user.username}'
+
+    # --- PRIDANÁ FUNKCIA PRE KONTROLU NAHLÁSENÍ ---
+    @property
+    def je_rizikovy(self):
+        """Vráti True, ak má používateľ dokopy 3 alebo viac nahlásení (profil + inzeráty)"""
+        # Keďže nemôžeme importovať Report hore kvôli cyklickému importu, importujeme ho priamo tu
+        from .models import Report
+        
+        pocet_nahlaseni_profilu = Report.objects.filter(obvineny=self.user).count()
+        pocet_nahlaseni_inzeratov = Report.objects.filter(inzerat__autor=self.user).count()
+        
+        celkovo = pocet_nahlaseni_profilu + pocet_nahlaseni_inzeratov
+        return celkovo >= 3 
+
 
 # Tieto funkcie automaticky vytvoria profil, keď sa zaregistruje nový User
 @receiver(post_save, sender=User)
@@ -40,16 +55,21 @@ class Report(models.Model):
     ]
 
     zalobca = models.ForeignKey(User, on_delete=models.CASCADE, related_name='podane_hlasenia')
-    obvineny = models.ForeignKey(User, on_delete=models.CASCADE, related_name='nahlásenia')
+    obvineny = models.ForeignKey(User, on_delete=models.CASCADE, related_name='nahlasenia', null=True, blank=True)
+    inzerat = models.ForeignKey(Inzerat, on_delete=models.CASCADE, related_name='nahlasenia', null=True, blank=True)
+    
     dovod = models.CharField(max_length=20, choices=DOVOD_CHOICES)
     popis = models.TextField(blank=True)
     vytvorene = models.DateTimeField(auto_now_add=True)
-    vyriesene = models.BooleanField(default=False) # Pre tvoju evidenciu v admine
+    vyriesene = models.BooleanField(default=False)
 
     def __str__(self):
-        return f"{self.zalobca} nahlásil {self.obvineny} - {self.dovod}"
+        if self.inzerat:
+            return f"{self.zalobca} nahlásil inzerát: {self.inzerat.nazov} - {self.get_dovod_display()}"
+        return f"{self.zalobca} nahlásil používateľa: {self.obvineny} - {self.get_dovod_display()}"
     
     class Meta:
         verbose_name = "Nahlásenie"
         verbose_name_plural = "Nahlásenia"
-        unique_together = ('zalobca', 'obvineny')
+        # UPRAVENÉ: unikátnosť riešime kombináciou, buď nahlásil osobu alebo konkrétny inzerát
+        unique_together = [('zalobca', 'obvineny'), ('zalobca', 'inzerat')]

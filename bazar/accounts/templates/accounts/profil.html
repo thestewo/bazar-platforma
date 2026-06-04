@@ -49,11 +49,28 @@
                 <div class="col-12 mb-2">
                     <div class="card bg-dark p-2 flex-row align-items-center justify-content-between border-secondary shadow-sm">
                         <div class="text-white ps-2">
-                            <strong>{{ inzerat.nazov }}</strong> - <span class="text-success fw-bold">{{ inzerat.cena }} €</span>
+                            {% if not inzerat.je_aktivny %}
+                                <span class="text-muted text-decoration-line-through">{{ inzerat.nazov }}</span> 
+                                <span class="badge bg-danger ms-1" style="font-size: 0.7rem;">Expirovaný</span>
+                            {% else %}
+                                <strong>{{ inzerat.nazov }}</strong>
+                            {% endif %}
+                            - <span class="text-success fw-bold">{{ inzerat.cena }} €</span>
                         </div>
-                        <div class="pe-2">
-                            <a href="{% url 'detail_inzeratu' inzerat.pk %}" class="btn btn-sm btn-outline-info">Pozrieť</a>
-                            <a href="{% url 'upravit_inzerat' inzerat.pk %}" class="btn btn-sm btn-outline-warning">Upraviť</a>
+                        <div class="pe-2 d-flex align-items-center gap-1">
+                            
+                            {% if not inzerat.je_aktivny %}
+                                <form method="POST" action="{% url 'predlzit_inzerat' inzerat.pk %}" class="m-0" onsubmit="return potvrdiPredlzenie(event, this);">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm btn-outline-success" title="Predĺžiť platnosť o 30 dní">
+                                        <i class="bi bi-clock-history me-1"></i>Obnoviť
+                                    </button>
+                                </form>
+                            {% else %}
+                                <a href="{% url 'detail_inzeratu' inzerat.pk %}" class="btn btn-sm btn-outline-info">Pozrieť</a>
+                                <a href="{% url 'upravit_inzerat' inzerat.pk %}" class="btn btn-sm btn-outline-warning">Upraviť</a>
+                            {% endif %}
+                            
                         </div>
                     </div>
                 </div>

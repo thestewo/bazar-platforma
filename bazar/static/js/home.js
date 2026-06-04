@@ -29,3 +29,53 @@ async function zistitPolohuFiltra(event) {
         btn.innerHTML = povodnyObsah;
     });
 }
+async function nacitatDalsieInzeraty() {
+    const btn = document.getElementById('nacitat-viac-btn');
+    const kontajner = document.getElementById('inzeraty-kontajner');
+    const currentPage = btn.getAttribute('data-page');
+    
+    const povodnyObsah = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Načítavam...';
+
+    const urlParams = new URLSearchParams(window.location.search);
+    urlParams.set('page', currentPage);
+
+    try {
+        const response = await fetch(`${window.location.pathname}?${urlParams.toString()}`, {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        });
+
+        if (response.ok) {
+            const htmlRiadky = await response.text();
+            
+            if (htmlRiadky.trim() === '') {
+                btn.style.display = 'none';
+            } else {
+                // Prilepíme nové inzeráty
+                kontajner.insertAdjacentHTML('beforeend', htmlRiadky);
+                
+                // SKONTROLUJEME HLAVIČKU ZO SERVERA, ČI EŠTE SÚ ĎALŠIE STRANY
+                const hasNext = response.headers.get('X-Has-Next');
+                
+                if (hasNext === 'false') {
+                    // Ak už ďalšia strana neexistuje, tlačidlo hneď schováme
+                    btn.style.display = 'none';
+                } else {
+                    // Ak ďalšia strana existuje, pripravíme tlačidlo na ďalšie kliknutie
+                    btn.setAttribute('data-page', parseInt(currentPage) + 1);
+                    btn.disabled = false;
+                    btn.innerHTML = povodnyObsah;
+                }
+            }
+        } else {
+            btn.style.display = 'none';
+        }
+    } catch (error) {
+        console.error("Chyba pri získavaní ďalších inzerátov:", error);
+        btn.disabled = false;
+        btn.innerHTML = povodnyObsah;
+    }
+}
