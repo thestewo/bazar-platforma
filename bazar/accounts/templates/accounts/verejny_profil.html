@@ -1,52 +1,106 @@
 {% extends "base.html" %}
-
-{% block content %}
+{% load static %} {% block content %}
 <div class="row mt-4 pb-5">
     <div class="col-md-4">
-        <div class="card p-4 shadow-sm">
-            <h3>{{ predajca.username }}</h3>
-            <hr>
+        <div class="card bg-dark p-4 shadow-sm border-secondary text-white">
+            <div class="d-flex align-items-center gap-2 mb-2">
+                <h3>{{ predajca.username }}</h3>
+                {% if predajca.profile.je_rizikovy %}
+                    <i class="bi bi-exclamation-triangle-fill text-warning fs-4" 
+                    style="cursor: help;" 
+                    title="Upozornenie: Tento používateľ bol viackrát nahlásený komunitou za porušenie pravidiel. Zvýšte opatrnosť!"></i>
+                {% endif %}
+            </div>
 
-            {% if predajca.first_name %}
-            <p><strong>Meno:</strong> {{ predajca.first_name }}</p>
-            {% endif %}
 
-            {% if predajca.last_name %}
-            <p><strong>Priezvisko:</strong> {{ predajca.last_name }}</p>
-            {% endif %}
+            <div class="mb-2">
+                <span class="text-warning fs-5"><i class="bi bi-star-fill"></i> {{ priemer|default:"0" }}</span>
+                <span class="text-muted small">({{ pocet_recenzii|default:"0" }} recenzií)</span>
+            </div>
+            <hr class="border-secondary">
 
-            {% if predajca.profile.telefon %}
-                <p><strong>Telefón:</strong> {{ predajca.profile.telefon }}</p>
+            {% if predajca.first_name %}<p><strong>Meno:</strong> {{ predajca.first_name }}</p>{% endif %}
+            {% if predajca.last_name %}<p><strong>Priezvisko:</strong> {{ predajca.last_name }}</p>{% endif %}
+            {% if predajca.profile.telefon %}<p><strong>Telefón:</strong> {{ predajca.profile.telefon }}</p>{% endif %}
+            {% if predajca.profile.mesto %}<p><strong>Mesto:</strong> {{ predajca.profile.mesto }}</p>{% endif %}
+            {% if predajca.email %}
+                <p><strong>Email:</strong> <a href="mailto:{{ predajca.email }}" class="text-info">{{ predajca.email }}</a></p>
             {% endif %}
             
-            {% if predajca.profile.mesto %}
-                <p><strong>Mesto:</strong> {{ predajca.profile.mesto }}</p>
+            {% if user.is_authenticated and user != predajca %}
+                <hr class="border-secondary">
+                {% if uz_nahlasil %}
+                    <button class="btn btn-outline-secondary btn-sm w-100 py-2 d-flex align-items-center justify-content-center gap-2" disabled>
+                        <i class="bi bi-check-all fs-5"></i> Už ste nahlásili
+                    </button>
+                {% else %}
+                    <button class="btn btn-sm btn-outline-danger w-100 py-2 d-flex align-items-center justify-content-center gap-2 fw-medium" 
+                            data-bs-toggle="modal" 
+                            data-bs-target="#reportModal" 
+                            title="Nahlásiť používateľa">
+                        <i class="bi bi-flag-fill"></i>
+                        <span style="font-size: 0.9rem;">Nahlásiť</span>
+                    </button>
+                {% endif %}
             {% endif %}
+        </div>
 
-            {% if predajca.email %}
-            <p><strong>Email:</strong> <a href="mailto:{{ predajca.email }}">{{ predajca.email }}</a></p>
-            {% endif %}
+        <div class="mt-4 card p-3 shadow bg-dark text-white border-secondary">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="mb-0">Recenzie</h5>
+                <div id="review-action-container">
+                    {% if user.is_authenticated and user != predajca %}
+                        {% if uz_hodnotil %}
+                            <button class="btn btn-sm btn-secondary" disabled>Už ste hodnotili</button>
+                        {% else %}
+                            <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#reviewModal">Pridať</button>
+                        {% endif %}
+                    {% elif user == predajca %}
+                        <span class="badge bg-secondary">Váš profil</span>
+                    {% endif %}
+                </div>
+            </div>
 
+            <div class="dropdown mb-3">
+                <button class="btn btn-secondary btn-sm dropdown-toggle w-100 border-0" type="button" data-bs-toggle="dropdown" id="sortDropdown">Zoradiť podľa</button>
+                <ul class="dropdown-menu dropdown-menu-dark shadow w-100">
+                    <li><a class="dropdown-item" href="javascript:void(0)" onclick="nacitajRecenzie('new')">Najnovšie</a></li>
+                    <li><a class="dropdown-item" href="javascript:void(0)" onclick="nacitajRecenzie('old')">Najstaršie</a></li>
+                    <li><a class="dropdown-item" href="javascript:void(0)" onclick="nacitajRecenzie('best')">Najlepšie (5★)</a></li>
+                    <li><a class="dropdown-item" href="javascript:void(0)" onclick="nacitajRecenzie('worst')">Najhoršie (1★)</a></li>
+                </ul>
+            </div>
+
+            <div id="recenzie-list" style="max-height: 450px; overflow-y: auto; padding-right: 5px;">
+                {% include 'accounts/recenzie_partial.html' %}
+            </div>
         </div>
     </div>
 
     <div class="col-md-8">
-        <h4>Inzeráty od tohto predajcu</h4>
+        <h4 class="text-white mb-4">Inzeráty od tohto predajcu</h4>
         <div class="row">
             {% for inzerat in inzeraty %}
                 <div class="col-md-6 mb-3">
-                    <div class="card h-100 shadow-sm">
+                    <div class="card bg-dark h-100 shadow-sm border-secondary text-white">
                         <div class="card-body">
                             <h5 class="card-title">{{ inzerat.nazov }}</h5>
-                            <p class="price-tag">{{ inzerat.cena }} €</p>
+                            <p class="fs-4 fw-bold text-success">{{ inzerat.cena }} €</p>
                             <a href="{% url 'detail_inzeratu' inzerat.pk %}" class="btn btn-outline-primary btn-sm w-100">Pozrieť</a>
                         </div>
                     </div>
                 </div>
             {% empty %}
-                <p class="text-muted">Tento používateľ momentálne nemá žiadne inzeráty.</p>
+                <div class="col-12 text-center mt-5">
+                    <p class="text-muted">Tento používateľ momentálne nemá žiadne inzeráty.</p>
+                </div>
             {% endfor %}
         </div>
     </div>
 </div>
+
+{% include 'accounts/includes/profil_modals.html' %}
+
+<script src="{% static 'js/profil.js' %}"></script>
+
 {% endblock %}

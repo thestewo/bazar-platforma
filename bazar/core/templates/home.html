@@ -1,17 +1,16 @@
 {% extends "base.html" %}
+{% load static %}
 
-{% block title %} GBST BAZÁR {% endblock %}
+{% block title %} NOVU {% endblock %}
 
 {% block content %}
 
-<div class="card bg-dark border-secondary shadow-lg mb-5" style="border-radius: 15px; overflow: hidden;">
+<div class="card bg-dark border-secondary shadow-lg mb-5 filter-card">
     <div class="card-body p-4">
-        <form method="GET" action="{% url 'home' %}" class="row g-3 align-items-end">
-            
-            <!-- Typ inzerátu ako prepínacie tlačidlá -->
+        <form method="GET" action="{% url 'home' %}" class="row g-3 align-items-end" id="filterForm">
             <div class="col-lg-3 col-md-12">
                 <label class="form-label text-white-50 small d-block">Typ inzerátu</label>
-                <div class="btn-group w-100" role="group" aria-label="Typ inzerátu">
+                <div class="btn-group w-100" role="group">
                     <input type="radio" class="btn-check" name="typ" id="typ_vsetky" value="" 
                         {% if not request.GET.typ %}checked{% endif %} onchange="this.form.submit()">
                     <label class="btn btn-outline-secondary" for="typ_vsetky">Všetky</label>
@@ -24,7 +23,6 @@
                 </div>
             </div>
 
-            <!-- Vyhľadávacie pole -->
             <div class="col-lg-3 col-md-6">
                 <label class="form-label text-white-50 small">Kľúčové slovo</label>
                 <div class="input-group">
@@ -34,11 +32,10 @@
                 </div>
             </div>
 
-            <!-- Kategória -->
-            <div class="col-lg-2 col-md-6">
+            <div class="col-lg-3 col-md-6">
                 <label class="form-label text-white-50 small">Kategória</label>
                 <select name="kategoria" class="form-select bg-dark text-white border-secondary">
-                    <option value="">Všetky</option>
+                    <option value="">Všetky kategórie</option>
                     {% for kat in kategorie %}
                         <option value="{{ kat.id }}" {% if request.GET.kategoria == kat.id|stringformat:"i" %}selected{% endif %}>
                             {{ kat.nazov }}
@@ -47,8 +44,7 @@
                 </select>
             </div>
 
-            <!-- Cena -->
-            <div class="col-lg-3 col-md-8">
+            <div class="col-lg-3 col-md-12">
                 <label class="form-label text-white-50 small">Cena (€)</label>
                 <div class="input-group">
                     <input type="number" name="min_cena" class="form-control bg-dark text-white border-secondary" 
@@ -58,68 +54,63 @@
                 </div>
             </div>
 
-            <!-- Submit Button -->
-            <div class="col-lg-1 col-md-4 d-grid">
-                <button type="submit" class="btn btn-primary">
-                    <i class="bi bi-funnel-fill"></i>
+            <div class="col-lg-5 col-md-8">
+                <label class="form-label text-white-50 small">Lokalita</label>
+                <div class="input-group">
+                    <span class="input-group-text bg-dark border-secondary text-white-50"><i class="bi bi-geo-alt"></i></span>
+                    <input type="text" id="filter-lokalita" name="l" class="form-control bg-dark text-white border-secondary" 
+                        placeholder="Mesto alebo PSČ" value="{{ request.GET.l|default:'' }}">
+                    <button type="button" class="btn btn-outline-info" onclick="zistitPolohuFiltra(event)">
+                        <i class="bi bi-geo-alt-fill"></i> Spresniť
+                    </button>
+                </div>
+            </div>
+
+            <div class="col-lg-3 col-md-4">
+                <label class="form-label text-white-50 small">Okolie (km)</label>
+                <div class="input-group">
+                    <input type="number" name="r" class="form-control bg-dark text-white border-secondary" 
+                           placeholder="km" min="0" max="15000" value="{{ request.GET.r|default:'' }}">
+                    <span class="input-group-text bg-dark border-secondary text-white-50">km</span>
+                </div>
+            </div>
+
+            <div class="col-lg-4 col-md-12 d-flex gap-2">
+                <button type="submit" class="btn btn-primary w-100 fw-bold">
+                    <i class="bi bi-funnel-fill me-2"></i>Filtrovať
                 </button>
+                {% if request.GET.q or request.GET.kategoria or request.GET.l or request.GET.r or request.GET.min_cena or request.GET.max_cena or request.GET.typ %}
+                    <a href="{% url 'home' %}" class="btn btn-outline-danger px-3" title="Zrušiť filtre">
+                        <i class="bi bi-x-lg"></i>
+                    </a>
+                {% endif %}
             </div>
         </form>
-
-        {% if request.GET.q or request.GET.kategoria or request.GET.min_cena or request.GET.max_cena or request.GET.typ %}
-            <div class="mt-3 text-center">
-                <a href="{% url 'home' %}" class="btn btn-outline-warning btn-sm border-0">
-                    <i class="bi bi-x-circle"></i> Zrušiť všetky filtre
-                </a>
-            </div>
-        {% endif %}
     </div>
 </div>
 
-<h2 class="mt-4 mb-4">Najnovšie inzeráty</h2>
-<div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 g-4">
-    {% for inzerat in inzeraty %}
-    <div class="col">
-        <div class="card h-100 shadow-sm border-secondary bg-dark text-white d-flex flex-column">
-            
-            {% if inzerat.obrazok %}
-                <img src="{{ inzerat.obrazok.url }}" class="card-img-top" alt="{{ inzerat.nazov }}" 
-                     style="height: 300px; object-fit: cover;">
-            {% else %}
-                <div class="bg-secondary d-flex align-items-center justify-content-center" style="height: 300px;">
-                    <i class="bi bi-image text-white-50" style="font-size: 2rem;"></i>
-                </div>
-            {% endif %}
+<h2 class="mt-4 mb-4 fw-bold">Najnovšie inzeráty</h2>
 
-            <div class="card-body d-flex flex-column">
-                <h5 class="card-title text-truncate" title="{{ inzerat.nazov }}">{{ inzerat.nazov }}</h5>
-                <h6 class="card-subtitle mb-2 text-primary fw-bold">{{ inzerat.cena }} €</h6>
-                
-                <!-- PRIDANÉ: Kategória a Typ -->
-                <div class="mb-2">
-                    <span class="badge bg-secondary small">{{ inzerat.kategoria.nazov }}</span>
-                    <span class="badge {% if inzerat.typ.nazov == 'Predaj' %}bg-info text-dark{% else %}bg-warning text-dark{% endif %} small">
-                        {{ inzerat.typ.nazov }}
-                    </span>
-                </div>
-
-                <p class="card-text small text-white-50">
-                    {{ inzerat.popis|truncatewords:10 }}
-                </p>
-
-                <div class="mt-auto">
-                    <a href="{% url 'detail_inzeratu' inzerat.pk %}" class="btn btn-primary w-100">
-                        Zobraziť viac
-                    </a>
-                </div>
-            </div>
+<div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 g-4" id="inzeraty-kontajner">
+    {% if inzeraty %}
+        {% include "inzeraty/inzeraty_list_partial.html" %}
+    {% else %}
+        <div class="col-12 py-5 text-center" id="empty-message">
+            <p class="text-white-50">Zatiaľ tu nie sú žiadne inzeráty.</p>
         </div>
-    </div>
-    {% empty %}
-    <div class="col-12">
-        <p class="text-center text-muted">Zatiaľ tu nie sú žiadne inzeráty.</p>
-    </div>
-    {% endfor %}
+    {% endif %}
 </div>
+
+<div class="text-center my-5">
+    <button id="nacitat-viac-btn" 
+            class="btn btn-outline-primary fw-bold px-5 py-3 shadow-sm text-uppercase" 
+            data-page="2" 
+            {% if not ma_dalsiu_stranu %}style="display: none;"{% endif %}
+            onclick="nacitatDalsieInzeraty()">
+        <i class="bi bi-arrow-clockwise me-2"></i>Zobraziť viac
+    </button>
+</div>
+
+<script src="{% static 'js/home.js' %}"></script>
 
 {% endblock %}

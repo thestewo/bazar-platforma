@@ -1,9 +1,135 @@
 {% extends "base.html" %}
+{% load static %}
+
+{% block title %}{% if inzerat %}Upraviť inzerát{% else %}Pridať inzerát{% endif %} | NOVU{% endblock %}
+
 {% block content %}
-<h2>Pridať nový inzerát</h2>
-<form method="POST" enctype="multipart/form-data">
-    {% csrf_token %}
-    {{ form.as_p }}
-    <button type="submit" class="btn btn-success">Uložiť inzerát</button>
-</form>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
+
+<script id="existing-photos-data" type="application/json">
+    [
+        {% if inzerat and inzerat.obrazok %}"{{ inzerat.obrazok.url }}"{% endif %}
+        {% if inzerat and inzerat.obrazok and inzerat.dodatocne_obrazky.all %},{% endif %}
+        {% if inzerat %}
+            {% for foto in inzerat.dodatocne_obrazky.all %}
+                "{{ foto.obrazok.url }}"{% if not forloop.last %},{% endif %}
+            {% endfor %}
+        {% endif %}
+    ]
+</script>
+
+<div class="row justify-content-center mt-5">
+    <div class="col-lg-8 col-md-10">
+        <div class="card shadow-lg border-secondary bg-dark text-white" style="border-radius: 15px;">
+            <div class="card-header border-bottom border-secondary p-4 {% if inzerat %}bg-warning bg-opacity-10{% else %}bg-success bg-opacity-10{% endif %}">
+                <h2 class="mb-0 fw-bold {% if inzerat %}text-warning{% else %}text-success{% endif %}">
+                    {% if inzerat %}
+                        <i class="bi bi-pencil-square me-2"></i>Upraviť inzerát
+                    {% else %}
+                        <i class="bi bi-plus-circle me-2"></i>Pridať nový inzerát
+                    {% endif %}
+                </h2>
+            </div>
+
+            <div class="card-body p-4">
+                <form method="POST" enctype="multipart/form-data" id="inzeratForm" data-next-url="{% if inzerat %}{% url 'detail_inzeratu' inzerat.pk %}{% else %}{% url 'home' %}{% endif %}">
+                    {% csrf_token %}
+
+                    <div class="row">
+                        <div class="col-md-8 mb-3">
+                            <label class="form-label fw-bold text-info">Názov inzerátu</label>
+                            {{ form.nazov }}
+                            <small class="text-muted">Zostáva znakov: <span id="char-count">50</span></small>
+                        </div>
+                        
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label fw-bold text-info">Cena</label>
+                            <div class="input-group">
+                                {{ form.cena }}
+                                <span class="input-group-text bg-secondary border-secondary text-white">€</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-info">Popis</label>
+                        {{ form.popis }}
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold text-info">Kategória</label>
+                            {{ form.kategoria }}
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold text-info">Typ inzerátu</label>
+                            {{ form.typ }}
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-info">Lokalita</label>
+                        <div class="input-group">
+                            <input type="text" id="lokalita-input" name="lokalita" class="form-control bg-secondary text-white border-secondary" value="{% if inzerat %}{{ inzerat.lokalita }}{% else %}{{ odhad_lokality|default:'' }}{% endif %}" placeholder="Mesto alebo obec">
+                            <button type="button" class="btn btn-outline-info" onclick="spresnitPolohu()">
+                                <i class="bi bi-geo-alt-fill"></i> Spresniť
+                            </button>
+                        </div>
+                        <small class="text-white-50" id="status-polohy">
+                            {% if inzerat %}Aktuálne nastavená lokalita.{% else %}Predvolený odhad podľa vašej sieci.{% endif %}
+                        </small>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label fw-bold text-info">Fotografie (Prvá bude hlavná)</label>
+                        <div id="dropZone" class="p-4 border border-secondary border-dashed rounded bg-black bg-opacity-25 text-center transition-all" style="cursor: pointer;">
+                            <input type="file" id="imageInput" accept="image/*" class="d-none" multiple>
+                            
+                            <div id="dropZonePrompt">
+                                <i class="bi bi-cloud-arrow-up-fill text-info" style="font-size: 3rem;"></i>
+                                <h5 class="mt-3">Pretiahnite fotky sem, vložte cez Ctrl+V alebo kliknite</h5>
+                                <button type="button" id="uploadBtn" class="btn btn-outline-info mb-2 px-4" onclick="document.getElementById('imageInput').click()">
+                                    <i class="bi bi-camera-fill me-2"></i> Vybrať fotky
+                                </button>
+                            </div>
+                            
+                            <div id="photoCount" class="small mb-3 text-white-50">0 / 10 fotografií</div>
+                            <div id="previews" class="d-flex flex-wrap gap-3 justify-content-center"></div>
+                        </div>
+                        <small class="text-white-50 mt-2 d-block text-center">Maximálne 10 fotografií. Podporuje Drag & Drop, Copy-Paste a vlastný orez.</small>
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center mt-5">
+                        <a href="{% if inzerat %}{% url 'detail_inzeratu' inzerat.pk %}{% else %}{% url 'home' %}{% endif %}" class="btn btn-outline-secondary px-4 text-white text-decoration-none">Zrušiť</a>
+                        <button type="submit" id="submit-btn" class="btn {% if inzerat %}btn-warning{% else %}btn-success{% endif %} btn-lg px-5 fw-bold shadow">
+                            <span id="btn-text"><i class="bi bi-check-lg me-1"></i> {% if inzerat %}Uložiť zmeny{% else %}Uložiť inzerát{% endif %}</span>
+                            <span id="btn-spinner" class="spinner-border spinner-border-sm d-none" role="status"></span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="cropModal" class="position-fixed top-0 start-0 w-100 h-100 d-none" style="background: rgba(0,0,0,0.95); z-index: 10000;">
+    <div class="d-flex align-items-center justify-content-center h-100">
+        <div class="bg-dark p-4 rounded shadow-lg border border-secondary" style="max-width: 800px; width: 95%;">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="text-info mb-0 fw-bold">Upraviť výrez fotografie</h5>
+                <button type="button" id="selectAllBtn" class="btn btn-sm btn-outline-info">Vybrať celú fotku</button>
+            </div>
+            <div style="height: 500px; background: #000;" class="rounded overflow-hidden">
+                <img id="imageToCrop" style="display: block; max-width: 100%;">
+            </div>
+            <div class="d-flex gap-3 mt-4">
+                <button type="button" id="cancelCrop" class="btn btn-outline-secondary w-100">Zrušiť</button>
+                <button type="button" id="saveCrop" class="btn btn-info w-100 fw-bold">Potvrdiť výber</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
+<script src="{% static 'js/pridat_inzerat.js' %}"></script>
 {% endblock %}

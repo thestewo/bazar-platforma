@@ -6,9 +6,39 @@ from django import forms
 from .models import Profile
 from django.core.exceptions import ValidationError
 class RegisterForm(UserCreationForm):
+    email = forms.EmailField(label="E-mail", widget=forms.EmailInput(attrs={'class': 'form-control', 'placeholder': 'nieco@gbst.sk'}))
+    username = forms.CharField(label="Používateľské meno", widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Zadajte meno'}))
+    suhlas = forms.BooleanField(
+        required=True, 
+        label="Súhlasím s obchodnými podmienkami a spracovaním osobných údajov (GDPR)"
+    )
     class Meta:
         model = User
         fields = ["username", "email"]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        
+        # 1. Hromadné pridanie Bootstrap triedy pre všetky polia
+        for name, field in self.fields.items():
+            if name == 'suhlas':
+                field.widget.attrs.update({'class': 'form-check-input'})
+            else:
+                field.widget.attrs.update({'class': 'form-control'})
+            
+        # 2. Preklad labelov pre heslá
+        self.fields['password1'].label = "Heslo"
+        self.fields['password2'].label = "Potvrdenie hesla"
+
+        # 3. RUČNÝ PREKLAD NÁPOVEDY (help_text)
+        # Tu prepisujeme tie dlhé anglické odseky o heslách
+        self.fields['password1'].help_text = (
+            "Vaše heslo nesmie byť príliš podobné vašim osobným údajom. "
+            "Musí obsahovať aspoň 8 znakov a nesmie byť bežne používané."
+        )
+        self.fields['password2'].help_text = "Pre potvrdenie zadajte heslo znova."
+        
+        self.fields['username'].help_text = "Povinné. Maximálne 150 znakov. Iba písmená, číslice a znaky @/./+/-/_."
 
 class UserUpdateForm(forms.ModelForm):
     class Meta:
@@ -54,7 +84,3 @@ class CustomLoginForm(AuthenticationForm):
                     params={'username': self.username_field.verbose_name},
                 )
         return self.cleaned_data
-
-
-
-
