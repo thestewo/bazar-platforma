@@ -1,9 +1,13 @@
+from datetime import timedelta
+
 from django.shortcuts import render
 from inzeraty.models import Inzerat, Kategoria, Typ
 from django.db.models import Q
 import requests
 from math import radians, cos, sin, asin, sqrt
-
+from django.core.paginator import Paginator, EmptyPage
+from django.http import HttpResponse
+from django.utils import timezone
 # 1. Pomocné funkcie
 def haversine(lon1, lat1, lon2, lat2):
     try:
@@ -49,8 +53,11 @@ def ziskaj_suradnice(mesto_text):
 
 def home(request):
     inzeraty = Inzerat.objects.filter(je_aktivny=True)
+    
     kategorie = Kategoria.objects.all()
     typy = Typ.objects.all()
+
+
 
     q = request.GET.get('q')
     kat_id = request.GET.get('kategoria')
@@ -63,10 +70,10 @@ def home(request):
 
     if q:
         inzeraty = inzeraty.filter(
-        Q(nazov__icontains=q) | 
-        Q(popis__icontains=q) | 
-        Q(skryte_tagy__icontains=q)
-    ).distinct()
+            Q(nazov__icontains=q) | 
+            Q(popis__icontains=q) | 
+            Q(skryte_tagy__icontains=q)
+        ).distinct()
     if kat_id:
         inzeraty = inzeraty.filter(kategoria_id=kat_id)
     if t_id:
@@ -77,7 +84,6 @@ def home(request):
         inzeraty = inzeraty.filter(cena__lte=max_cena)
 
     if mesto_hladane:
-        # OPRAVA: Pridané _ pre tretiu vracanú hodnotu (názov), ktorú tu nepotrebujeme
         h_lat, h_lon, _ = ziskaj_suradnice(mesto_hladane)
         
         if h_lat and h_lon:
@@ -102,10 +108,38 @@ def home(request):
 
     inzeraty = inzeraty.order_by('-vytvorene')
     
+    # Paginácia na 16 kusov
+    paginator = Paginator(inzeraty, 16)
+    page_number = request.GET.get('page', 1)
+    
+    # --- OPRAVA DUPLIKOVANIA POMOCOU TRY-EXCEPT ---
+    try:
+        page_obj = paginator.get_page(page_number)
+        
+        # Ak si cez AJAX pýtame stranu, ktorá je väčšia ako skutočný počet strán,
+        # get_page by vrátil poslednú stranu. My ale chceme vyvolať EmptyPage, aby sme ju zachytili.
+        if request.headers.get('x-requested-with') == 'XMLHttpRequest' and int(page_number) > paginator.num_pages:
+            raise EmptyPage
+            
+    except EmptyPage:
+        # Ak už ďalšia strana neexistuje a ide o AJAX, vrátime úplne prázdny HTML dopyt
+        if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+            return HttpResponse('')
+        # Pre klasické načítanie (ak by niekto ručne prepísal URL na blbosť) vrátime poslednú stranu
+        page_obj = paginator.get_page(paginator.num_pages)
+
+    # AK JE TO AJAX POŽIADAVKA A STRANA EXISTUJE
+    if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+        response = render(request, 'inzeraty/inzeraty_list_partial.html', {'inzeraty': page_obj})
+        response['X-Has-Next'] = 'true' if page_obj.has_next() else 'false'
+        return response
+    
+    # KLASICKÉ NAČÍTANIE STRÁNKY
     return render(request, 'home.html', {
-        'inzeraty': inzeraty,
+        'inzeraty': page_obj,
         'kategorie': kategorie,
-        'typy': typy
+        'typy': typy,
+        'ma_dalsiu_stranu': page_obj.has_next()
     })
 
 def vop_view(request):

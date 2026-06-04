@@ -29,6 +29,11 @@ urlpatterns = [
     # AI ANALÝZA (AJAX)
     path('<int:pk>/ai-analyza/', views.ai_analyza_ajax, name='ai_analyza_ajax'),
 
+    # Nahlásenie inzerátu
+    path('inzerat/<int:pk>/nahlasit/', views.nahlasit_inzerat, name='nahlasit_inzerat'),
+    
+    # Predĺženie inzerátu
+    path('inzerat/<int:pk>/predlzit/', views.predlzit_inzerat, name='predlzit_inzerat'),
 ]
 
 # Statické a mediálne súbory (stačí raz na konci)

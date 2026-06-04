@@ -10,6 +10,10 @@ from django.core.cache import cache
 from .forms import InzeratForm
 from .models import Inzerat, Konverzacia, Sprava, InzeratObrazok
 from .utils import vygeneruj_skryte_tagy, ziskaj_ai_analyzu
+from django.views.decorators.http import require_POST
+from accounts.models import Report
+from django.utils import timezone
+from datetime import timedelta
 
 # ==========================================================================
 # --- POMOCNÉ FUNKCIE (Upratané a zjednodušené) ---
@@ -154,7 +158,36 @@ def odstranit_inzerat(request, pk):
     return render(request, 'inzeraty/potvrdit_zmazanie.html', {'inzerat': inzerat})
 
 def detail_inzeratu(request, pk):
-    return render(request, 'inzeraty/detail.html', {'inzerat': get_object_or_404(Inzerat, pk=pk)})
+    # Vypočítame hraničný čas (teraz mínus 30 dní)
+    hranica_expiracie = timezone.now() - timedelta(days=30)
+    
+    # Získame inzerát, ktorý musí byť aktívny A zároveň vytvorený po tejto hranici
+    inzerat = get_object_or_404(
+        Inzerat, 
+        pk=pk, 
+        je_aktivny=True, 
+        vytvorene__gte=hranica_expiracie
+    )
+    
+    return render(request, 'inzeraty/detail.html', {'inzerat': inzerat})
+
+@login_required
+def predlzit_inzerat(request, pk):
+    if request.method == 'POST':
+        # Zabezpečíme, aby používateľ mohol predĺžiť iba SVOJ vlastný inzerát
+        inzerat = get_object_or_404(Inzerat, pk=pk, autor=request.user)
+        
+        # Nastavíme ho ako aktívny a reštartujeme 30-dňovú lehotu na 'teraz'
+        inzerat.vytvorene = timezone.now()
+        inzerat.je_aktivny = True
+        inzerat.save(update_fields=['vytvorene', 'je_aktivny'])
+        
+        # Presmerujeme ho späť na profil, kde uvidí zmenu
+        return redirect('profil')  # <-- Prípadne použi 'accounts:profil' ak máš namespace
+        
+    return HttpResponse(status=400)
+
+
 
 def ai_analyza_ajax(request, pk):
     return JsonResponse({'analyza': ziskaj_ai_analyzu(get_object_or_404(Inzerat, pk=pk))})
@@ -237,3 +270,36 @@ def upravit_spravu(request, sprava_id):
         sprava.save(update_fields=['text'])
         return HttpResponse(status=200)
     return HttpResponse(status=400)
+
+
+
+
+@login_required
+@require_POST
+def nahlasit_inzerat(request, pk):
+    inzerat = get_object_or_404(Inzerat, pk=pk)
+    
+    # Používateľ nemôže nahlásiť vlastný inzerát
+    if inzerat.autor == request.user:
+        return JsonResponse({'error': 'Nemôžete nahlásiť vlastný inzerát.'}, status=400)
+        
+    dovod = request.POST.get('dovod')
+    popis = request.POST.get('popis', '')
+    
+    if not dovod:
+        return JsonResponse({'error': 'Musíte vybrať dôvod nahlásenia.'}, status=400)
+        
+    # Skontrolujeme, či už tento inzerát náhodou nahlásil
+    strix = Report.objects.filter(zalobca=request.user, inzerat=inzerat).exists()
+    if strix:
+        return JsonResponse({'error': 'Tento inzerát ste už nahlásili.'}, status=400)
+        
+    # Vytvorenie nahlásenia
+    Report.objects.create(
+        zalobca=request.user,
+        inzerat=inzerat,
+        dovod=dovod,
+        popis=popis
+    )
+    
+    return JsonResponse({'success': 'Inzerát bol úspešne nahlásený. Admini situáciu preveria.'})
