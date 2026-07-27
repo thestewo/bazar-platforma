@@ -8,6 +8,7 @@ from math import radians, cos, sin, asin, sqrt
 from django.core.paginator import Paginator, EmptyPage
 from django.http import HttpResponse
 from django.utils import timezone
+
 # 1. Pomocné funkcie
 def haversine(lon1, lat1, lon2, lat2):
     try:
@@ -57,8 +58,6 @@ def home(request):
     kategorie = Kategoria.objects.all()
     typy = Typ.objects.all()
 
-
-
     q = request.GET.get('q')
     kat_id = request.GET.get('kategoria')
     t_id = request.GET.get('typ')
@@ -76,13 +75,16 @@ def home(request):
         ).distinct()
     if kat_id:
         inzeraty = inzeraty.filter(kategoria_id=kat_id)
+        
     if t_id:
-        inzeraty = inzeraty.filter(typ_id=t_id)
+        inzeraty = inzeraty.filter(typ=t_id)
+        
     if min_cena:
         inzeraty = inzeraty.filter(cena__gte=min_cena)
     if max_cena:
         inzeraty = inzeraty.filter(cena__lte=max_cena)
 
+    # === TU JE OPRAVENÁ LOGIKA PRE LOKALITU A OKOLIE ===
     if mesto_hladane:
         h_lat, h_lon, _ = ziskaj_suradnice(mesto_hladane)
         
@@ -98,7 +100,11 @@ def home(request):
                         if vzdialenost <= okruh_val:
                             id_v_okruhu.append(inz.id)
                     
-                    inzeraty = inzeraty.filter(id__in=id_v_okruhu)
+                    # ZMENA: Akceptujeme inzeráty z okruhu ALEBO tie, čo obsahujú hľadané mesto v názve lokality
+                    inzeraty = inzeraty.filter(
+                        Q(id__in=id_v_okruhu) | Q(lokalita__icontains=mesto_hladane)
+                    ).distinct()
+                    
                 except ValueError:
                     inzeraty = inzeraty.filter(lokalita__icontains=mesto_hladane)
             else:
@@ -112,29 +118,20 @@ def home(request):
     paginator = Paginator(inzeraty, 16)
     page_number = request.GET.get('page', 1)
     
-    # --- OPRAVA DUPLIKOVANIA POMOCOU TRY-EXCEPT ---
     try:
         page_obj = paginator.get_page(page_number)
-        
-        # Ak si cez AJAX pýtame stranu, ktorá je väčšia ako skutočný počet strán,
-        # get_page by vrátil poslednú stranu. My ale chceme vyvolať EmptyPage, aby sme ju zachytili.
         if request.headers.get('x-requested-with') == 'XMLHttpRequest' and int(page_number) > paginator.num_pages:
             raise EmptyPage
-            
     except EmptyPage:
-        # Ak už ďalšia strana neexistuje a ide o AJAX, vrátime úplne prázdny HTML dopyt
         if request.headers.get('x-requested-with') == 'XMLHttpRequest':
             return HttpResponse('')
-        # Pre klasické načítanie (ak by niekto ručne prepísal URL na blbosť) vrátime poslednú stranu
         page_obj = paginator.get_page(paginator.num_pages)
 
-    # AK JE TO AJAX POŽIADAVKA A STRANA EXISTUJE
     if request.headers.get('x-requested-with') == 'XMLHttpRequest':
         response = render(request, 'inzeraty/inzeraty_list_partial.html', {'inzeraty': page_obj})
         response['X-Has-Next'] = 'true' if page_obj.has_next() else 'false'
         return response
     
-    # KLASICKÉ NAČÍTANIE STRÁNKY
     return render(request, 'home.html', {
         'inzeraty': page_obj,
         'kategorie': kategorie,
@@ -166,4 +163,4 @@ def vytvor_ticket(request):
         )
         return HttpResponse(status=200)
         
-    return HttpResponse(status=400) # GET požiadavky na túto URL ignorujeme
+    return HttpResponse(status=400)

@@ -12,6 +12,7 @@ urlpatterns = [
     path('<int:pk>/', views.detail_inzeratu, name='detail_inzeratu'),
     path('<int:pk>/upravit/', views.upravit_inzerat, name='upravit_inzerat'),
     path('<int:pk>/odstranit/', views.odstranit_inzerat, name='odstranit_inzerat'),
+    path('vymazat-fotku/<int:fotka_id>/', views.vymazat_fotku_ajax, name='vymazat_fotku_ajax'),
     
     # CHAT LOGIKA
     path('moje-spravy/', views.moje_chaty, name='moje_chaty'),
@@ -25,6 +26,7 @@ urlpatterns = [
     path('chat/nacitat/<int:konverzacia_id>/', views.nacitat_spravy, name='nacitat_spravy'),
     path('chat/sprava/zmazat/<int:sprava_id>/', views.zmazat_spravu, name='zmazat_spravu'),
     path('sprava/upravit/<int:sprava_id>/', views.upravit_spravu, name='upravit_spravu'),
+    path('chat/sprava/nahlasit/<int:sprava_id>/', views.nahlasit_spravu, name='nahlasit_spravu'),
     
     # AI ANALÝZA (AJAX)
     path('<int:pk>/ai-analyza/', views.ai_analyza_ajax, name='ai_analyza_ajax'),

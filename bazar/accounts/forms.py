@@ -31,7 +31,6 @@ class RegisterForm(UserCreationForm):
         self.fields['password2'].label = "Potvrdenie hesla"
 
         # 3. RUČNÝ PREKLAD NÁPOVEDY (help_text)
-        # Tu prepisujeme tie dlhé anglické odseky o heslách
         self.fields['password1'].help_text = (
             "Vaše heslo nesmie byť príliš podobné vašim osobným údajom. "
             "Musí obsahovať aspoň 8 znakov a nesmie byť bežne používané."
@@ -39,6 +38,23 @@ class RegisterForm(UserCreationForm):
         self.fields['password2'].help_text = "Pre potvrdenie zadajte heslo znova."
         
         self.fields['username'].help_text = "Povinné. Maximálne 150 znakov. Iba písmená, číslice a znaky @/./+/-/_."
+
+    # === TU JE NOVÁ VALIDÁCIA PRE E-MAIL ===
+    def clean_email(self):
+        email = self.cleaned_data.get('email')
+        
+        if email:
+            email = email.lower()  # Prevedieme na malé písmená pre istotu
+            if not email.endswith('@gbst.sk'):
+                raise forms.ValidationError(
+                    "Registrácia je povolená iba pre školské e-mailové adresy s doménou @gbst.sk."
+                )
+        
+        # Ak už existuje používateľ s rovnakým e-mailom (voliteľná kontrola, ak chceš unikátne e-maily)
+        if User.objects.filter(email=email).exists():
+            raise forms.ValidationError("Používateľ s týmto e-mailom už existuje.")
+
+        return email
 
 class UserUpdateForm(forms.ModelForm):
     class Meta:

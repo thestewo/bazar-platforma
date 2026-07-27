@@ -34,6 +34,9 @@ document.addEventListener('DOMContentLoaded', function() {
     let croppedBlobs = [];
     const MAX_PHOTOS = 10;
     
+    // Sprístupníme pole fotiek globálne pre skript v HTML šablóne
+    window.nahraneFotky = croppedBlobs;
+    
     const imageInput = document.getElementById('imageInput');
     const previews = document.getElementById('previews');
     const cropModal = document.getElementById('cropModal');
@@ -72,6 +75,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         const fileName = url.split('/').pop() || `povodna_foto_${index}.jpg`;
                         const file = new File([blob], fileName, { type: blob.type });
                         croppedBlobs.push(file);
+                        window.nahraneFotky = croppedBlobs; // Synchronizácia
                         renderPreviews();
                         updateInterface();
                     })
@@ -119,7 +123,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         pendingFiles = [...pendingFiles, ...selectedFiles];
-        if (cropModal?.classList.contains('d-none')) processNextFile();
+        if (cropModal?.classList.contains('d-none') || !cropModal) processNextFile();
     }
 
     // --- 3. OREZÁVANIE (CROPPER) ---
@@ -168,6 +172,7 @@ document.addEventListener('DOMContentLoaded', function() {
         canvas.toBlob(blob => {
             const file = new File([blob], `img_${Date.now()}.jpg`, { type: "image/jpeg" });
             croppedBlobs.push(file);
+            window.nahraneFotky = croppedBlobs; // Synchronizácia
             renderPreviews();
             updateInterface();
             cropModal?.classList.add('d-none');
@@ -185,15 +190,42 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!previews) return;
         previews.innerHTML = "";
         
-        // Vytvorenie dočasnej funkcie v objekte window, aby fungovalo inline mazanie tlačidlom
         window._removePhotoGlobal = function(index) {
+            const itemToRemove = croppedBlobs[index];
+            
+            // AK JE TO EXISTUJÚCA FOTKA -> AJAX MAZANIE
+            if (window.existujuceFotkyDeleteUrls && typeof itemToRemove === 'object' && itemToRemove.name) {
+                const fileName = itemToRemove.name;
+                for (const [dbUrl, deleteUrl] of Object.entries(window.existujuceFotkyDeleteUrls)) {
+                    if (dbUrl.endsWith(fileName)) {
+                        fetch(deleteUrl, {
+                            method: 'POST',
+                            headers: {
+                                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value || '',
+                                'X-Requested-With': 'XMLHttpRequest'
+                            }
+                        }).catch(err => console.error("Chyba pri mazaní z DB:", err));
+                        break;
+                    }
+                }
+            }
+
             croppedBlobs.splice(index, 1);
+            window.nahraneFotky = croppedBlobs; // Synchronizácia
             renderPreviews();
             updateInterface();
         };
 
         croppedBlobs.forEach((file, index) => {
-            const url = URL.createObjectURL(file);
+            let url;
+            if (file instanceof Blob) {
+                url = URL.createObjectURL(file);
+            } else if (typeof file === 'string') {
+                url = file;
+            } else {
+                return;
+            }
+
             const div = document.createElement('div');
             div.className = "position-relative m-1";
             div.innerHTML = `
@@ -217,62 +249,5 @@ document.addEventListener('DOMContentLoaded', function() {
             photoCountDisplay.classList.replace('text-danger', 'text-white-50');
             if (uploadBtn) uploadBtn.disabled = false;
         }
-    }
-
-    // --- 5. ODOSLANIE FORMY ---
-    const form = document.getElementById('inzeratForm');
-    form.onsubmit = function(e) {
-        e.preventDefault();
-        
-        const btn = document.getElementById('submit-btn');
-        const btnText = document.getElementById('btn-text');
-        const btnSpinner = document.getElementById('btn-spinner');
-        const nextUrl = this.getAttribute('data-next-url');
-        const csrfToken = this.querySelector('[name=csrfmiddlewaretoken]')?.value;
-
-        if (croppedBlobs.length === 0) {
-            alert("Pridajte aspoň jednu fotografiu.");
-            return;
-        }
-
-        btn.disabled = true;
-        if (btnText) btnText.innerText = "Spracovávam (AI analýza)...";
-        btnSpinner?.classList.remove('d-none');
-
-        let formData = new FormData(this);
-        formData.delete('dodatocne_obrazky'); 
-        
-        croppedBlobs.forEach((file, index) => {
-            formData.append('dodatocne_obrazky', file, file.name || `foto_${index}.jpg`);
-        });
-
-        fetch(window.location.href, {
-            method: 'POST',
-            body: formData,
-            headers: { 'X-CSRFToken': csrfToken }
-        })
-        .then(async response => {
-            if (response.ok) {
-                window.location.href = nextUrl;
-            } else if (response.status === 429) {
-                alert("Spomaľte! Inzerát môžete pridať raz za 30 sekúnd.");
-                resetButton(btn, btnText, btnSpinner);
-            } else {
-                alert("Chyba pri ukladaní. Skontrolujte povinné polia.");
-                resetButton(btn, btnText, btnSpinner);
-            }
-        })
-        .catch(err => {
-            console.error("Chyba siete:", err);
-            alert("Chyba pripojenia k serveru.");
-            resetButton(btn, btnText, btnSpinner);
-        });
-    };
-
-    function resetButton(btn, text, spinner) {
-        if (!btn) return;
-        btn.disabled = false;
-        if (text) text.innerHTML = '<i class="bi bi-check-lg me-1"></i> Uložiť inzerát';
-        spinner?.classList.add('d-none');
     }
 });

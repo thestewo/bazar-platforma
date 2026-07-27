@@ -18,6 +18,16 @@
     ]
 </script>
 
+<script id="existing-photos-delete-urls" type="application/json">
+    {
+        {% if inzerat %}
+            {% for foto in inzerat.dodatocne_obrazky.all %}
+                "{{ foto.obrazok.url }}": "{% url 'vymazat_fotku_ajax' foto.pk %}"{% if not forloop.last %},{% endif %}
+            {% endfor %}
+        {% endif %}
+    }
+</script>
+
 <div class="row justify-content-center mt-5">
     <div class="col-lg-8 col-md-10">
         <div class="card shadow-lg border-secondary bg-dark text-white" style="border-radius: 15px;">
@@ -130,6 +140,366 @@
     </div>
 </div>
 
+<style>
+    .CenzuraOverlay {
+        display: none;
+        position: fixed;
+        z-index: 9999;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.7);
+        align-items: center;
+        justify-content: center;
+    }
+
+    .CenzuraObsah {
+        background-color: #212529;
+        color: #fff;
+        padding: 30px;
+        border-radius: 12px;
+        max-width: 500px;
+        width: 90%;
+        text-align: center;
+        box-shadow: 0 4px 25px rgba(0,0,0,0.5);
+        border: 1px solid #495057;
+        animation: popupSkok 0.3s ease;
+    }
+
+    .CenzuraObsah h3 { margin-top: 0; font-size: 22px; }
+    .CenzuraObsah p { font-size: 16px; line-height: 1.5; margin: 15px 0 25px 0; color: #dee2e6; }
+    .CenzuraZatvoritBtn { padding: 10px 25px; font-size: 16px; border-radius: 5px; cursor: pointer; font-weight: bold; transition: background 0.2s; }
+
+    @keyframes popupSkok {
+        from { transform: scale(0.8); opacity: 0; }
+        to { transform: scale(1); opacity: 1; }
+    }
+</style>
+
+<div id="cenzuraModal" class="CenzuraOverlay">
+    <div class="CenzuraObsah" id="cenzuraObsahBox" style="border-top: 5px solid #6c757d;">
+        <h3 id="cenzuraModalHeader" class="text-white">⏳ Spracovávam...</h3>
+        <p id="cenzuraDovodText">Prosím, čakajte...</p>
+        <button class="btn btn-secondary CenzuraZatvoritBtn" onclick="zatvorCenzuraModal()">Rozumiem</button>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+<script src="https://cdn.jsdelivr.net/npm/nsfwjs"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
-<script src="{% static 'js/pridat_inzerat.js' %}"></script>
+
+<script src="{% static 'js/pridat_inzerat.js' %}?v={% now 'U' %}"></script>
+
+<script>
+    let nsfwModel;
+    window.isFormSubmittingGlobal = false; // Globálny poistný zámok proti double-submitom
+
+    // === OPRAVENÉ NAČÍTANIE: Už žiadny Django kód priamo v JS objekte ===
+    const deleteUrlsElement = document.getElementById('existing-photos-delete-urls');
+    window.existujuceFotkyDeleteUrls = deleteUrlsElement ? JSON.parse(deleteUrlsElement.textContent || '{}') : {};
+
+    async function nacitajNSFWModel() {
+        if (!nsfwModel) {
+            try {
+                nsfwModel = await nsfw.load();
+            } catch (err) {
+                console.error("Chyba pri načítaní NSFW.js modelu:", err);
+            }
+        }
+    }
+    nacitajNSFWModel();
+
+    function zatvorCenzuraModal() {
+        document.getElementById('cenzuraModal').style.display = 'none';
+    }
+
+    const mojFormular = document.getElementById('inzeratForm');
+
+    // === 2. REVOLUČNÝ FIX: SLEDOVANIE ZMIEN V POLE window.nahraneFotky ===
+    if (window.nahraneFotky) {
+        const originalSplice = window.nahraneFotky.splice;
+        
+        window.nahraneFotky.splice = function(index, howMany, ...items) {
+            const odstranenePolozky = window.nahraneFotky.slice(index, index + howMany);
+            
+            odstranenePolozky.forEach(polozka => {
+                let fotoUrl = null;
+                
+                if (typeof polozka === 'string') {
+                    fotoUrl = polozka;
+                } 
+                else if (polozka && polozka.url) {
+                    fotoUrl = polozka.url;
+                }
+                else if (polozka && polozka.src) {
+                    fotoUrl = polozka.src;
+                }
+
+                if (fotoUrl && window.existujuceFotkyDeleteUrls) {
+                    for (const [dbUrl, deleteUrl] of Object.entries(window.existujuceFotkyDeleteUrls)) {
+                        if (fotoUrl === dbUrl || fotoUrl.endsWith(dbUrl) || dbUrl.endsWith(fotoUrl)) {
+                            console.log("AJAX maže fotku z DB cez URL:", deleteUrl);
+                            
+                            fetch(deleteUrl, {
+                                method: 'POST',
+                                headers: {
+                                    'X-CSRFToken': '{{ csrf_token }}',
+                                    'X-Requested-With': 'XMLHttpRequest'
+                                }
+                            })
+                            .then(response => {
+                                if (response.ok) {
+                                    console.log("Fotografia úspešne vymazaná z databázy aj disku.");
+                                    delete window.existujuceFotkyDeleteUrls[dbUrl];
+                                } else {
+                                    console.error("Server odmietol vymazať fotografiu (Status:", response.status, ")");
+                                }
+                            })
+                            .catch(error => console.error("Chyba AJAX požiadavky pri mazaní:", error));
+                            break;
+                        }
+                    }
+                }
+            });
+
+            return originalSplice.apply(this, [index, howMany, ...items]);
+        };
+    }
+
+    // === 3. ODOSLANIE FORMULÁRA A KONTROLA ===
+    if (mojFormular) {
+        mojFormular.addEventListener('submit', async function(e) {
+            e.preventDefault(); 
+            
+            if (window.isFormSubmittingGlobal) return;
+            window.isFormSubmittingGlobal = true;
+            
+            const submitBtn = document.getElementById('submit-btn');
+            const btnText = document.getElementById('btn-text');
+            const btnSpinner = document.getElementById('btn-spinner');
+            const modalHeader = document.getElementById('cenzuraModalHeader');
+            const obsahBox = document.getElementById('cenzuraObsahBox');
+            const zatvorBtn = document.querySelector('.CenzuraZatvoritBtn');
+
+            function obnovTlacidloText() {
+                btnText.textContent = "";
+                const icon = document.createElement('i');
+                icon.className = "bi bi-check-lg me-1";
+                btnText.appendChild(icon);
+                btnText.appendChild(document.createTextNode("{% if inzerat %}Uložiť zmeny{% else %}Uložiť inzerát{% endif %}"));
+            }
+
+            submitBtn.disabled = true;
+            btnSpinner.classList.remove('d-none');
+
+            const nazovInput = mojFormular.querySelector('[name="nazov"]');
+            const popisInput = mojFormular.querySelector('[name="popis"]');
+            const celkovyPocetZnakov = ((nazovInput ? nazovInput.value : '') + (popisInput ? popisInput.value : '')).trim().length;
+            const spustitAIAnalyzu = celkovyPocetZnakov >= 20;
+
+            let suboryNaKontrolu = window.nahraneFotky || [];
+
+            if (suboryNaKontrolu.length === 0) {
+                modalHeader.className = "text-warning";
+                modalHeader.innerText = "⚠️ Chýbajúca fotografia";
+                obsahBox.style.borderTop = "5px solid #ffc107";
+                zatvorBtn.className = "btn btn-warning CenzuraZatvoritBtn";
+                document.getElementById('cenzuraDovodText').innerText = "Pridajte na predaj aspoň jednu fotografiu.";
+                document.getElementById('cenzuraModal').style.display = 'flex';
+                zatvorBtn.onclick = zatvorCenzuraModal;
+
+                submitBtn.disabled = false;
+                btnSpinner.classList.add('d-none');
+                obnovTlacidloText();
+                window.isFormSubmittingGlobal = false;
+                return;
+            }
+
+            if (suboryNaKontrolu.length > 0 && spustitAIAnalyzu) {
+                if (!nsfwModel) {
+                    btnText.innerText = "Načítavam filter fotiek...";
+                    await nacitajNSFWModel();
+                }
+
+                if (nsfwModel) {
+                    btnText.innerText = "Kontrolujem fotografie...";
+                    const noveFotkyNaKontrolu = suboryNaKontrolu.filter(file => file && file instanceof Blob);
+
+                    if (noveFotkyNaKontrolu.length > 0) {
+                        try {
+                            const kontrolyPromises = noveFotkyNaKontrolu.map(file => {
+                                return new Promise((resolve) => {
+                                    const img = new Image();
+                                    img.width = 400; 
+                                    img.height = 400;
+                                    const objectUrl = URL.createObjectURL(file);
+                                    img.src = objectUrl;
+
+                                    img.onload = async () => {
+                                        try {
+                                            const predictions = await nsfwModel.classify(img);
+                                            URL.revokeObjectURL(objectUrl);
+                                            
+                                            let dovod = null;
+                                            predictions.forEach(p => {
+                                                if ((p.className === 'Porn' || p.className === 'Hentai') && p.probability > 0.85) {
+                                                    dovod = `Nevhodný obsah (${(p.probability * 100).toFixed(1)}%)`;
+                                                }
+                                            });
+                                            resolve({ file, dovod });
+                                        } catch (err) {
+                                            URL.revokeObjectURL(objectUrl);
+                                            resolve({ file, dovod: null });
+                                        }
+                                    };
+                                    img.onerror = () => {
+                                        URL.revokeObjectURL(objectUrl);
+                                        resolve({ file, dovod: null });
+                                    };
+                                });
+                            });
+
+                            const vysledky = await Promise.all(kontrolyPromises);
+                            const najdenaZavadnaFotka = vysledky.find(v => v.dovod !== null);
+
+                            if (najdenaZavadnaFotka) {
+                                modalHeader.className = "text-danger";
+                                modalHeader.innerText = "🚨 Nevhodná fotografia";
+                                obsahBox.style.borderTop = "5px solid #dc3545";
+                                zatvorBtn.className = "btn btn-danger CenzuraZatvoritBtn";
+                                document.getElementById('cenzuraDovodText').innerText = `Fotografia "${najdenaZavadnaFotka.file.name || 'v poradí'}" nebola prijatá: ${najdenaZavadnaFotka.dovod}. Bola automaticky odstránená.`;
+                                document.getElementById('cenzuraModal').style.display = 'flex';
+                                zatvorBtn.onclick = zatvorCenzuraModal;
+
+                                // === FIX: AUTOMATICKÉ VYRADENIE LEN TEJTO JEDNEJ ZLEJ FOTKY ===
+                                const indexNaOdstranenie = window.nahraneFotky.indexOf(najdenaZavadnaFotka.file);
+                                if (indexNaOdstranenie !== -1) {
+                                    // Keďže mažeme Blob (objekt), naša funkcia vyššie bezpečne zistí, 
+                                    // že nejde o existujúcu URL z DB a nespustí AJAX mazanie.
+                                    window.nahraneFotky.splice(indexNaOdstranenie, 1);
+                                }
+
+                                // Odstránime vizuálny náhľad z HTML zóny, aby zmizla aj z obrazovky
+                                const previews = document.getElementById('previews');
+                                if (previews && najdenaZavadnaFotka.file.name) {
+                                    Array.from(previews.children).forEach(child => {
+                                        if (child.innerText && child.innerText.includes(najdenaZavadnaFotka.file.name)) {
+                                            child.remove();
+                                        }
+                                    });
+                                }
+
+                                // Aktualizujeme text počítadla (napr. z 2 / 10 naspäť na 1 / 10)
+                                const photoCount = document.getElementById('photoCount');
+                                if (photoCount) {
+                                    photoCount.innerText = `${window.nahraneFotky.length} / 10 fotografií`;
+                                }
+
+                                submitBtn.disabled = false;
+                                btnSpinner.classList.add('d-none');
+                                obnovTlacidloText();
+                                window.isFormSubmittingGlobal = false;
+                                return; 
+                            }
+                        } catch (error) {
+                            console.error("Chyba analýzy:", error);
+                        }
+                    }
+                }
+            }
+
+            btnText.innerText = "Ukladám inzerát...";
+            let formData = new FormData(this);
+            
+            if (window.nahraneFotky) {
+                formData.delete('fotky'); 
+                if (window.nahraneFotky.length === 0 || window.nahraneFotky[0] instanceof Blob) {
+                    formData.delete('obrazok');
+                }
+
+                window.nahraneFotky.forEach((foto, index) => {
+                    if (foto instanceof Blob) {
+                        if (index === 0) {
+                            formData.append('obrazok', foto, 'hlavna_foto.jpg');
+                        } else {
+                            formData.append('fotky', foto, `foto_${index}.jpg`);
+                        }
+                    }
+                });
+            }
+
+            const urlAkcia = this.action || window.location.href;
+
+            fetch(urlAkcia, {
+                method: 'POST',
+                body: formData,
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            })
+            .then(response => {
+                const contentType = response.headers.get("content-type");
+                if (contentType && contentType.indexOf("application/json") !== -1) {
+                    return response.json().then(data => ({ status: response.status, data: data }));
+                } else {
+                    if (response.redirected) {
+                        window.location.href = response.url;
+                    } else {
+                        return { status: response.status, data: { redirect_url: mojFormular.getAttribute('data-next-url') || '/' } };
+                    }
+                }
+            })
+            .then(res => {
+                if (!res) return;
+
+                submitBtn.disabled = false;
+                btnSpinner.classList.add('d-none');
+                obnovTlacidloText();
+
+                if (res.status === 200) {
+                    let cielovaUrl = res.data.redirect_url || '{% url "home" %}';
+                    const separator = cielovaUrl.includes('?') ? '&' : '?';
+                    cielovaUrl = `${cielovaUrl}${separator}update=${new Date().getTime()}`;
+
+                    if (res.data && res.data.info_message) {
+                        modalHeader.className = "text-info";
+                        modalHeader.innerText = "ℹ️ Informácia o inzeráte";
+                        obsahBox.style.borderTop = "5px solid #0dcaf0";
+                        zatvorBtn.className = "btn btn-info CenzuraZatvoritBtn";
+                        document.getElementById('cenzuraDovodText').innerText = res.data.info_message;
+                        document.getElementById('cenzuraModal').style.display = 'flex';
+                        
+                        zatvorBtn.onclick = function() { window.location.href = cielovaUrl; };
+                    } else {
+                        window.location.href = cielovaUrl;
+                    }
+                } else if (res.status === 400 && res.data && res.data.error) {
+                    modalHeader.className = "text-warning";
+                    modalHeader.innerText = "⚠️ Chyba vo formulári";
+                    obsahBox.style.borderTop = "5px solid #ffc107";
+                    zatvorBtn.className = "btn btn-warning CenzuraZatvoritBtn";
+                    document.getElementById('cenzuraDovodText').innerText = res.data.error;
+                    document.getElementById('cenzuraModal').style.display = 'flex';
+                    zatvorBtn.onclick = zatvorCenzuraModal;
+                    window.isFormSubmittingGlobal = false;
+                } else {
+                    modalHeader.className = "text-warning";
+                    modalHeader.innerText = "⚠️ Chyba spracovania";
+                    obsahBox.style.borderTop = "5px solid #ffc107";
+                    zatvorBtn.className = "btn btn-warning CenzuraZatvoritBtn";
+                    document.getElementById('cenzuraDovodText').innerText = "Skontrolujte zadané údaje (popis musí byť dostatočne dlhý) alebo nahrané súbory.";
+                    document.getElementById('cenzuraModal').style.display = 'flex';
+                    zatvorBtn.onclick = zatvorCenzuraModal;
+                    window.isFormSubmittingGlobal = false;
+                }
+            })
+            .catch(error => {
+                console.error("Chyba spracovania:", error);
+                submitBtn.disabled = false;
+                btnSpinner.classList.add('d-none');
+                obnovTlacidloText();
+                window.isFormSubmittingGlobal = false;
+            });
+        });
+    }
+</script>
 {% endblock %}
