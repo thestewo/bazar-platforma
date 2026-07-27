@@ -8,7 +8,11 @@
             {% csrf_token %}
             {{ u_form.as_p }}
             {{ p_form.as_p }}
-            <button class="btn btn-primary w-100" type="submit">Uložiť zmeny</button>
+            <button class="btn btn-primary w-100 mb-2" type="submit">Uložiť zmeny</button>
+            
+            <a href="{% url 'rozsirene_nastavenia' %}" class="btn btn-outline-secondary w-100">
+                <i class="bi bi-gear-fill me-1"></i> Rozšírené nastavenia
+            </a>
         </form>
 
         <div class="card p-3 shadow bg-dark text-white border-secondary">
@@ -24,16 +28,13 @@
                 </div>
             </div>
 
-            <div class="dropdown mb-3">
-                <button class="btn btn-secondary btn-sm dropdown-toggle w-100 border-0" type="button" data-bs-toggle="dropdown">
-                    Zoradiť podľa
-                </button>
-                <ul class="dropdown-menu dropdown-menu-dark shadow w-100">
-                    <li><a class="dropdown-item" href="javascript:void(0)" onclick="nacitajRecenzie('new')">Najnovšie</a></li>
-                    <li><a class="dropdown-item" href="javascript:void(0)" onclick="nacitajRecenzie('old')">Najstaršie</a></li>
-                    <li><a class="dropdown-item" href="javascript:void(0)" onclick="nacitajRecenzie('best')">Najlepšie (5★)</a></li>
-                    <li><a class="dropdown-item" href="javascript:void(0)" onclick="nacitajRecenzie('worst')">Najhoršie (1★)</a></li>
-                </ul>
+            <div class="mb-3">
+                <select class="form-select form-select-sm bg-secondary text-white border-0" onchange="nacitajRecenzie(this.value)">
+                    <option value="new" selected>Najnovšie</option>
+                    <option value="old">Najstaršie</option>
+                    <option value="best">Najlepšie (5★)</option>
+                    <option value="worst">Najhoršie (1★)</option>
+                </select>
             </div>
 
             <div id="recenzie-list" style="max-height: 400px; overflow-y: auto; padding-right: 5px;">

@@ -105,6 +105,40 @@
     </div>
 </div>
 
+<div class="modal fade" id="reportModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content bg-dark text-white border-secondary shadow-lg">
+            <form id="reportForm" method="POST" action="">
+                {% csrf_token %}
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title text-warning"><i class="bi bi-flag-fill me-2"></i>Nahlásiť správu</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="reportReason" class="form-label">Dôvod nahlásenia:</label>
+                        <select name="dovod" id="reportReason" class="form-select bg-secondary text-white border-0" required>
+                            <option value="" disabled selected>Vyberte dôvod...</option>
+                            <option value="spam">Spam / Podvod</option>
+                            <option value="vulgarizmy">Vulgarizmy / Nadávky</option>
+                            <option value="nevhodny_obsah">Nevhodný obsah (explicitný/NSFW)</option>
+                            <option value="ine">Iné dôvody</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="reportKomentar" class="form-label">Podrobnejší popis (voliteľné):</label>
+                        <textarea name="komentar" id="reportKomentar" class="form-control bg-secondary text-white border-0" rows="3" placeholder="Sem môžete napísať viac detailov pre administrátora..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer border-secondary">
+                    <button type="button" class="btn btn-outline-light" data-bs-dismiss="modal">Zrušiť</button>
+                    <button type="submit" class="btn btn-warning text-dark fw-bold">Odoslať nahlásenie</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <script>
     function otvorFotku(url) {
         const modalImg = document.getElementById('modalImage');
@@ -256,7 +290,7 @@
             }
 
             vybraneSubory = [];
-            vykresliNahľady();
+            vkresliNahľady();
             if (!konverzaciaId || konverzaciaId === "") { window.location.reload(); } else { nacitajNoveSpravy(); }
         });
     }
@@ -277,37 +311,34 @@
     setInterval(nacitajNoveSpravy, 3000);
 
     function zmazatSpravu(event, id) {
-    event.preventDefault();
-    const riadokSpravy = event.target.closest('.mb-3');
-    
-    if (riadokSpravy) {
-        fetch("/inzeraty/chat/sprava/zmazat/" + id + "/", {
-            method: 'POST',
-            headers: { 
-                'X-CSRFToken': '{{ csrf_token }}',
-                'X-Requested-With': 'XMLHttpRequest'
-            }
-        }).then(res => {
-            if (res.ok) {
-                // Skontrolujeme, či nám server nepovedal, že zmazal celú konverzáciu
-                if (res.headers.get('content-type')?.includes('application/json')) {
-                    res.json().then(data => {
-                        if (data.status === 'conversation_deleted') {
-                            window.location.href = "{% url 'moje_chaty' %}"; // Presmerovanie na zoznam
-                            return;
-                        }
-                    });
+        event.preventDefault();
+        const riadokSpravy = event.target.closest('.mb-3');
+        
+        if (riadokSpravy) {
+            fetch("/inzeraty/chat/sprava/zmazat/" + id + "/", {
+                method: 'POST',
+                headers: { 
+                    'X-CSRFToken': '{{ csrf_token }}',
+                    'X-Requested-With': 'XMLHttpRequest'
                 }
-                
-                // Ak konverzácia ešte žije, len odstránime správu z obrazovky
-                riadokSpravy.style.opacity = "0";
-                setTimeout(() => { riadokSpravy.remove(); }, 200);
-            } else {
-                window.location.reload();
-            }
-        });
+            }).then(res => {
+                if (res.ok) {
+                    if (res.headers.get('content-type')?.includes('application/json')) {
+                        res.json().then(data => {
+                            if (data.status === 'conversation_deleted') {
+                                window.location.href = "{% url 'moje_chaty' %}";
+                                return;
+                            }
+                        });
+                    }
+                    riadokSpravy.style.opacity = "0";
+                    setTimeout(() => { riadokSpravy.remove(); }, 200);
+                } else {
+                    window.location.reload();
+                }
+            });
+        }
     }
-}
 
     function otvorEdit(id, text) {
         document.getElementById('editTextarea').value = text;
@@ -328,5 +359,65 @@
             }
         });
     });
+
+    // JAVASCRIPT: Funkcie pre nahlásenie správy
+    function otvorReport(id) {
+        document.getElementById('reportReason').value = "";
+        document.getElementById('reportKomentar').value = "";
+        document.getElementById('reportForm').action = "/inzeraty/chat/sprava/nahlasit/" + id + "/";
+        new bootstrap.Modal(document.getElementById('reportModal')).show();
+    }
+
+    document.getElementById('reportForm')?.addEventListener('submit', function(e) {
+        e.preventDefault();
+        fetch(this.action, { 
+            method: 'POST', 
+            body: new FormData(this), 
+            headers: {'X-CSRFToken': '{{ csrf_token }}', 'X-Requested-With': 'XMLHttpRequest'} 
+        }).then(res => {
+            if (res.ok) {
+                bootstrap.Modal.getInstance(document.getElementById('reportModal')).hide();
+                alert("Správa bola úspešne nahlásená adminovi na prešetrenie.");
+            } else {
+                alert("Nepodarilo sa odoslať nahlásenie. Skúste to neskôr.");
+            }
+        });
+    });
+</script>
+
+<script>
+// Predchádzajúci kód pre nsfwModel filter zostáva bez zmeny
+async function skontrolujChatObrazok(file) {
+    if (!nsfwModel) {
+        nsfwModel = await nsfw.load();
+    }
+    return new Promise((resolve) => {
+        const img = new Image();
+        img.src = URL.createObjectURL(file);
+        img.onload = async () => {
+            const predictions = await nsfwModel.classify(img);
+            URL.revokeObjectURL(img.src);
+            let jeZavadny = false;
+            predictions.forEach(p => {
+                if ((p.className === 'Porn' || p.className === 'Hentai') && p.probability > 0.50) jeZavadny = true;
+                if (p.className === 'Sexy' && p.probability > 0.80) jeZavadny = true;
+            });
+            resolve(jeZavadny);
+        };
+    });
+}
+
+const chatObrazokInput = document.getElementById('id_chat_obrazok') || document.querySelector('input[name="obrazok"]');
+if (chatObrazokInput) {
+    chatObrazokInput.addEventListener('change', async function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        const jeNevhodny = await skontrolujChatObrazok(file);
+        if (jeNevhodny) {
+            alert("Tento obrázok nemôžete poslať v chate. Obsahuje nevhodný alebo explicitný obsah.");
+            chatObrazokInput.value = "";
+        }
+    });
+}
 </script>
 {% endblock %}

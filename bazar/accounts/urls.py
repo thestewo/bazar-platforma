@@ -13,4 +13,5 @@ urlpatterns = [
     path('profil/<int:user_id>/recenzia/', views.pridat_recenziu, name='pridat_recenziu'),
     path('recenzia/zmazat/<int:recenzia_id>/', views.zmazat_recenziu, name='zmazat_recenziu'),
     path('pouzivatel/<int:user_id>/nahlasit/', views.nahlasit_pouzivatela, name='nahlasit_pouzivatela'),
+    path('profil/nastavenia/', views.rozsirene_nastavenia, name='rozsirene_nastavenia'),
 ]

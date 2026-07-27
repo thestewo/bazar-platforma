@@ -14,6 +14,9 @@ from accounts.models import Recenzia
 from django.http import HttpResponse
 from django.db.models import Avg
 from .models import Report
+from django.contrib.auth.forms import PasswordChangeForm
+from django.contrib.auth import update_session_auth_hash
+
 
 class MyLoginView(auth_views.LoginView):
     def form_valid(self, form):
@@ -245,3 +248,51 @@ def nahlasit_pouzivatela(request, user_id):
             return HttpResponse(status=200)
             
     return HttpResponse("Neplatná požiadavka", status=400)
+
+
+@login_required
+def rozsirene_nastavenia(request):
+    if request.method == 'POST':
+        akcia = request.POST.get('akcia')
+        
+        # 1. SPRACÚVANIE ZMENY EMAILU
+        if akcia == 'zmena_emailu':
+            novy_email = request.POST.get('email', '').strip()
+            if novy_email:
+                if User.objects.exclude(pk=request.user.pk).filter(email=novy_email).exists():
+                    messages.error(request, "Tento e-mail už používa iný účet.")
+                else:
+                    request.user.email = novy_email
+                    request.user.save(update_fields=['email'])
+                    messages.success(request, "E-mailová adresa bola úspešne zmenená.")
+            else:
+                messages.error(request, "E-mail nemôže byť prázdny.")
+            return redirect('rozsirene_nastavenia')
+
+        # 2. SPRACÚVANIE ZMENY HESLA
+        elif akcia == 'zmena_hesla':
+            password_form = PasswordChangeForm(request.user, request.POST)
+            if password_form.is_valid():
+                user = password_form.save()
+                update_session_auth_hash(request, user)  # Udrží používateľa prihláseného po zmene hesla
+                messages.success(request, "Vaše heslo bolo úspešne zmenené.")
+                return redirect('rozsirene_nastavenia')
+            else:
+                messages.error(request, "Opravte chyby vo formulári zmeny hesla.")
+                # Ak formulár nie je validný, vykreslíme stránku znova s chybami
+                return render(request, 'accounts/rozsirene_nastavenia.html', {
+                    'password_form': password_form
+                })
+
+        # 3. SPRACÚVANIE ZMAZANIA ÚČTU
+        elif akcia == 'zmazat_ucet':
+            user = request.user
+            user.delete()
+            messages.success(request, "Váš účet bol permanentne odstránený.")
+            return redirect('login')
+
+    # Predvolené načítanie stránky (GET)
+    password_form = PasswordChangeForm(request.user)
+    return render(request, 'accounts/rozsirene_nastavenia.html', {
+        'password_form': password_form
+    })

@@ -1,17 +1,20 @@
 import os
-import google.generativeai as genai
-from ddgs import DDGS
+import json
+import re
 from PIL import Image
+from ddgs import DDGS
+from google import genai
+from google.genai import types
+
+# Globálna inicializácia nového klienta (automaticky si vezme GEMINI_API_KEY z prostredia)
+client = genai.Client()
 
 def ziskaj_ai_analyzu(inzerat):
-    api_key = os.getenv("GEMINI_API_KEY")
-    
-    # 1. Lokalizované vyhľadávanie (region 'sk-sk' a pridanie "cena v eurach")
+    # 1. Lokalizované vyhľadávanie
     search_query = f"{inzerat.nazov} cena v eurach slovensko"
     web_context = ""
     
     try:
-        # Region 'sk-sk' povie DuckDuckGo, aby preferoval slovenské stránky (Heureka, Nay, Alza atď.)
         with DDGS() as ddgs:
             results = list(ddgs.text(search_query, region='sk-sk', max_results=3))
             for r in results:
@@ -20,12 +23,6 @@ def ziskaj_ai_analyzu(inzerat):
         print(f"DEBUG: Chyba DuckDuckGo: {e}")
         web_context = "Nepodarilo sa získať aktuálne slovenské dáta z webu."
 
-    genai.configure(api_key=api_key)
-    model = genai.GenerativeModel(
-        'models/gemini-3.1-flash-lite',
-        generation_config={"temperature": 0.2}
-    )
-    
     prompt = f"""
     Si prísny analytik pre slovenský bazárový trh so špecializáciou na zberateľské predmety a nedostatkový tovar.
     Tvojou úlohou je chrániť kupujúceho, ale zároveň objektívne rozpoznať hodnotu vzácnych kúskov.
@@ -50,7 +47,7 @@ def ziskaj_ai_analyzu(inzerat):
 
     2. VIZUÁLNY STAV A POPIS:
        - Skontroluj fotku (reálna vs. katalógová).
-       - Pri oblečení/obuvi hľadaj známky nosenia (napr. "creases" na teniskách, žmolky, stav podrážky).
+       - Pri oblečení/obuvi hľadaj známky nosenia (napr. "creases" na teniskách, žmolky, stav dodgy).
        - Porovnaj popis (napr. "MISB", "nové", "použité") s cenou. Ak predajca pýta resell cenu za poškodený kus, upozorni na to.
 
     3. NA ČO SI DAŤ POZOR (3 body):
@@ -67,27 +64,33 @@ def ziskaj_ai_analyzu(inzerat):
         try:
             img = Image.open(inzerat.obrazok.path)
             content.append(img)
-        except:
-            pass
+        except Exception as e:
+            print(f"DEBUG: Nepodarilo sa otvoriť obrázok pre analýzu: {e}")
+
+    for dodatocny in inzerat.dodatocne_obrazky.all():
+        if dodatocny.obrazok:
+            try:
+                img_dodatocna = Image.open(dodatocny.obrazok.path)
+                content.append(img_dodatocna)
+            except Exception as e:
+                print(f"DEBUG: Nepodarilo sa otvoriť dodatočný obrázok pre analýzu: {e}")
 
     try:
-        response = model.generate_content(content)
+        # Volanie cez novú knižnicu google-genai
+        response = client.models.generate_content(
+            model='gemini-3.1-flash-lite',
+            contents=content,
+            config=types.GenerateContentConfig(temperature=0.2)
+        )
         return response.text
     except Exception as e:
-        print(f"DEBUG: Chyba Gemini: {e}")
-        return "AI analýza momentálne nie je k dispozícii."
-    
+        print(f"DEBUG: Chyba Gemini pri analýze: {e}")
+        return "AI analýza momentálne nie je k dispozícii kvôli vyčerpaniu limitov."
+
 def vygeneruj_skryte_tagy(inzerat):
     if not inzerat.popis or len(inzerat.popis) < 150:
         print(f"DEBUG: Popis je krátky ({len(inzerat.popis if inzerat.popis else '')} zn.), preskakujem AI tagy.")
         return ""
-
-    api_key = os.getenv("GEMINI_API_KEY")
-    if not api_key:
-        return ""
-
-    genai.configure(api_key=api_key)
-    model = genai.GenerativeModel('models/gemini-3.1-flash-lite')
 
     prompt = f"""
     Si pomocník pre slovenský bazár. Na základe názvu "{inzerat.nazov}" a popisu vygeneruj 
@@ -102,10 +105,94 @@ def vygeneruj_skryte_tagy(inzerat):
     """
 
     try:
-        response = model.generate_content(prompt)
+        response = client.models.generate_content(
+            model='gemini-3.1-flash-lite',
+            contents=prompt
+        )
         tagy = response.text.strip()
         print(f"DEBUG: AI vygenerovalo tagy: {tagy}")
         return tagy
     except Exception as e:
         print(f"DEBUG: Chyba pri generovaní tagov: {e}")
         return ""
+
+# INTERNÝ BLACKLIST
+LOKALNY_BLACKLIST = [
+    'marihuana', 'tráva', 'piko', 'pervitín', 'kokain', 'heroin', 'extaza', 'mdma', 'drogy',
+    'samopal', 'pištol', 'zbraň', 'granát', 'výbušnina', 'ak47',
+    'xanax', 'neurol', 'tramal', 'fentanyl',
+    'kokot', 'piča', 'jebať', 'vyjeban', 'čurák'
+]
+
+def obsahuje_zakazane_slova(text: str) -> bool:
+    if not text:
+        return False
+    text_lower = text.lower()
+    for slovo in LOKALNY_BLACKLIST:
+        if slovo in text_lower:
+            return True
+    return False
+
+# BACKEND MODERÁCIA
+SYSTEM_PROMPT = """
+Si nekompromisný automatický moderator slovenského online bazáru a chatovacieho systému "Novu". 
+Tvojou úlohou je analyzovať text a priložené obrázky.
+
+Hľadáš nasledujúci zakázaný obsah:
+1. Drogy a omamné látky.
+2. Zbrane, strelivo, výbušniny.
+3. Podvody (Scam), phishing.
+4. Vulgarizmy, urážky.
+5. Iná nelegálna činnosť.
+
+Odpovedaj STRIKTNE vo formáte JSON:
+{{
+  "schvalene": true/false,
+  "status": "Schválený" / "Zamietnutý" / "Karanténa",
+  "dovod": "Stručné zdôvodnenie v slovenčine",
+  "kategoria_problemu": "drogy" / "zbrane" / "scam" / "vulgarizmy" / "ine" / "ziadna"
+}}
+"""
+
+def skontroluj_obsah_cez_gemini(text: str, obrazky_list: list = None) -> dict:
+    obsah_pre_gemini = [f"Text na analýzu:\n{text}"]
+    
+    if obrazky_list:
+        for img_file in obrazky_list:
+            if img_file:
+                try:
+                    img = Image.open(img_file)
+                    obsah_pre_gemini.append(img)
+                except Exception as e:
+                    print(f"Chyba spracovania obrázka pre Gemini: {e}")
+
+    try:
+        response = client.models.generate_content(
+            model='gemini-3.1-flash-lite',
+            contents=obsah_pre_gemini,
+            config=types.GenerateContentConfig(
+                system_instruction=SYSTEM_PROMPT,
+                response_mime_type="application/json",
+            ),
+        )
+        return json.loads(response.text)
+    except Exception as e:
+        print(f"Gemini API zlyhalo (Tokeny minulé alebo výpadok): {e}")
+        # BEZPEČNOSTNÁ POISTKA: Ak minieš tokeny, inzerát ide automaticky do Karantény a NESCHVÁLI sa!
+        return {
+            "schvalene": False,
+            "status": "Karanténa",
+            "dovod": "Chyba systému kontroly (API nedostupné).",
+            "kategoria_problemu": "ine"
+        }
+
+def hlavna_kontrola_obsahu(text: str, obrazky_list: list = None) -> dict:
+    if obsahuje_zakazane_slova(text):
+        return {
+            "schvalene": False,
+            "status": "Zamietnutý",
+            "dovod": "Obsahuje slovo z interného zoznamu zakázaných výrazov.",
+            "kategoria_problemu": "vulgarizmy_alebo_drogy"
+        }
+    
+    return skontroluj_obsah_cez_gemini(text, obrazky_list)
