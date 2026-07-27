@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4 pb-5" style="max-width: 800px;">
+    <div class="d-flex align-items-center mb-4">
+        <a href="{% url 'profil' %}" class="btn btn-outline-light btn-sm me-3">
+            <i class="bi bi-arrow-left"></i> Späť na profil
+        </a>
+        <h2 class="text-white mb-0">Rozšírené nastavenia účtu</h2>
+    </div>
+
+    <div class="card bg-dark text-white border-secondary shadow mb-4 p-4">
+        <h4 class="text-info mb-3"><i class="bi bi-envelope me-2"></i>Zmena e-mailovej adresy</h4>
+        <form method="POST">
+            {% csrf_token %}
+            <input type="hidden" name="akcia" value="zmena_emailu">
+            <div class="mb-3">
+                <label class="form-label text-muted">Aktuálny e-mail: <strong>{{ user.email }}</strong></label>
+                <input type="email" name="email" class="form-control bg-dark border-secondary text-white" placeholder="Nový e-mail" required>
+            </div>
+            <button type="submit" class="btn btn-primary btn-sm">Aktualizovať e-mail</button>
+        </form>
+    </div>
+
+    <div class="card bg-dark text-white border-secondary shadow mb-4 p-4">
+        <h4 class="text-warning mb-3"><i class="bi bi-shield-lock me-2"></i>Zmena hesla</h4>
+        <form method="POST">
+            {% csrf_token %}
+            <input type="hidden" name="akcia" value="zmena_hesla">
+            
+            {% for field in password_form %}
+                <div class="mb-2">
+                    <label class="form-label small text-muted mb-1">{{ field.label }}</label>
+                    {{ field }}
+                    {% if field.errors %}
+                        <div class="text-danger small">{{ field.errors|striptags }}</div>
+                    {% endif %}
+                </div>
+            {% endfor %}
+            
+            <button type="submit" class="btn btn-warning btn-sm mt-2 text-dark fw-bold">Zmeniť heslo</button>
+        </form>
+    </div>
+
+    <div class="card bg-dark text-white border-danger shadow p-4">
+        <h4 class="text-danger mb-3"><i class="bi bi-exclamation-triangle me-2"></i>Zmazanie profilu</h4>
+        <p class="text-muted small">Odstránením účtu permanentne zmažete všetky svoje inzeráty, históriu správ a udelené hodnotenia. Túto akciu nie je možné vrátiť späť.</p>
+        
+        <button type="button" class="btn btn-danger btn-sm" data-bs-toggle="modal" data-bs-target="#ZmazatUcetModal">
+            Permanentne zmazať môj účet
+        </button>
+    </div>
+</div>
+
+<div class="modal fade" id="ZmazatUcetModal" tabindex="-1" aria-labelledby="ZmazatUcetModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" style="max-width: 450px;">
+        <div class="modal-content bg-dark text-white border-danger shadow-lg" style="border-radius: 15px;">
+            <div class="modal-header border-bottom border-secondary bg-danger bg-opacity-10 p-3">
+                <h5 class="modal-title fw-bold text-danger" id="ZmazatUcetModalLabel">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i>Zmazať účet
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4 text-center">
+                <h5 class="fw-bold mb-3">Chcete definitívne zmazať svoj účet?</h5>
+                <p class="text-muted small mb-0">
+                    Všetky vaše inzeráty, história doterajších konverzácií a udelené hodnotenia budú natrvalo odstránené.
+                </p>
+            </div>
+            <div class="modal-footer border-0 p-3 d-flex justify-content-center gap-2">
+                <button type="button" class="btn btn-outline-secondary px-4" data-bs-dismiss="modal">Zrušiť</button>
+                
+                <form method="POST" style="display: inline;">
+                    {% csrf_token %}
+                    <input type="hidden" name="akcia" value="zmazat_ucet">
+                    <button type="submit" class="btn btn-danger px-4 fw-bold">Áno, zmazať</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* Stylovanie form polí vygenerovaných Djangom pre heslo */
+    input[type="password"] {
+        width: 100%;
+        background: #2b3035 !important;
+        border: 1px solid #495057 !important;
+        color: white !important;
+        border-radius: 5px;
+        padding: 6px 12px;
+    }
+    .helptext { 
+        display: block; 
+        font-size: 0.75rem; 
+        color: #6c757d; 
+        margin-top: 3px; 
+    }
+    
+    /* Oprava pre menu navbaru */
+    .card ul { 
+        list-style: none; 
+        padding-left: 0; 
+        margin-bottom: 0; 
+        font-size: 0.75rem; 
+        color: #6c757d; 
+    }
+</style>
+{% endblock %}
