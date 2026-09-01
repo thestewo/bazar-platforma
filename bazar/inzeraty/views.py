@@ -345,13 +345,36 @@ def zacat_chat(request, inzerat_id):
 
 @login_required
 def chat_detail(request, inzerat_id):
-    inzerat = get_object_or_404(Inzerat, id=inzerat_id)
-    konverzacia = Konverzacia.objects.filter(inzerat=inzerat).filter(Q(kupujuci=request.user) | Q(predajca=request.user)).first()
+    inzerat = get_object_or_404(Inzerat, id=inzerat_id) 
+    kupujuci_id = request.GET.get('kupujuci_id')
+    
+    # Ak je používateľ admin a v URL posielame ID kupujúceho:
+    if request.user.is_staff and kupujuci_id:
+        konverzacia = Konverzacia.objects.filter(
+            inzerat=inzerat, 
+            kupujuci_id=kupujuci_id
+        ).first()
+    else:
+        # Štandardná logika pre normálnych používateľov
+        konverzacia = Konverzacia.objects.filter(
+            inzerat=inzerat
+        ).filter(
+            Q(kupujuci=request.user) | Q(predajca=request.user)
+        ).first()
+        
     spravy = []
     if konverzacia:
-        konverzacia.spravy.filter(precitane=False).exclude(odosielatel=request.user).update(precitane=True)
+        # Označiť správy ako prečítané len vtedy, ak si chat pozerá bežný účastník (nie admin pri kontrole)
+        if not request.user.is_staff:
+            konverzacia.spravy.filter(precitane=False).exclude(odosielatel=request.user).update(precitane=True)
+            
         spravy = konverzacia.spravy.all().order_by('poslane')
-    return render(request, 'inzeraty/chat_detail.html', {'inzerat': inzerat, 'konverzacia': konverzacia, 'spravy': spravy})
+        
+    return render(request, 'inzeraty/chat_detail.html', {
+        'inzerat': inzerat, 
+        'konverzacia': konverzacia, 
+        'spravy': spravy
+    })
 
 @login_required
 def moje_chaty(request):
