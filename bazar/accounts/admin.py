@@ -22,10 +22,10 @@ class ReportAdmin(admin.ModelAdmin):
     # Zoradenie: najprv nevyriešené, potom pod seba zoskupí podľa cieľov incidentu
     ordering = ('vyriesene', 'obvineny', 'inzerat__autor', 'sprava__odosielatel', '-vytvorene')
     
-    # Polia, ktoré v detaile nahlásenia admin nemôže prepisovať (PRIDANÁ 'sprava')
+    # Polia, ktoré v detaile nahlásenia admin nemôže prepisovať
     readonly_fields = ('vytvorene', 'zalobca', 'obvineny', 'inzerat', 'sprava', 'dovod', 'popis', 'link_na_web')
     
-    # Prehľadné rozdelenie detailu nahlásenia do sekcií (PRIDANÁ 'sprava' do prvého bloku)
+    # Prehľadné rozdelenie detailu nahlásenia do sekcií
     fieldsets = (
         ('Detaily incidentu', {
             'fields': ('zalobca', 'obvineny', 'inzerat', 'sprava', 'dovod', 'popis', 'vytvorene')
@@ -61,7 +61,12 @@ class ReportAdmin(admin.ModelAdmin):
     def link_na_web(self, obj):
         """Univerzálne tlačidlo: presmeruje admina na detail inzerátu, profilu alebo priamo do chatu."""
         if obj.sprava:
-            url = reverse('chat_detail', kwargs={'inzerat_id': obj.sprava.konverzacia.inzerat.pk})
+            # OPRAVA: Odovzdávame ID inzerátu a GET parameter zujemca_id (kupujúceho)
+            inzerat_id = obj.sprava.konverzacia.inzerat.pk
+            kupujuci_id = obj.sprava.konverzacia.kupujuci.pk  # Prípadne obj.sprava.konverzacia.kupujuci.pk podľa vašich názvov polí
+            
+            url = f"{reverse('chat_detail', kwargs={'inzerat_id': inzerat_id})}?kupujuci_id={kupujuci_id}"
+            
             return format_html(
                 '<a href="{}" target="_blank" class="button" style="padding:3px 10px; background:#a370f7; color:#fff; font-weight:bold; border-radius:4px; text-decoration:none;">Zobraziť chat</a>', 
                 url
