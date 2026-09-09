@@ -2,7 +2,7 @@ import os
 import json
 import re
 from PIL import Image
-from ddgs import DDGS
+from duckduckgo_search import DDGS
 from google import genai
 from google.genai import types
 

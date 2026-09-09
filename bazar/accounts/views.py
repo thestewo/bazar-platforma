@@ -16,7 +16,7 @@ from django.db.models import Avg
 from .models import Report
 from django.contrib.auth.forms import PasswordChangeForm
 from django.contrib.auth import update_session_auth_hash
-
+from django.conf import settings
 
 class MyLoginView(auth_views.LoginView):
     def form_valid(self, form):
@@ -39,7 +39,7 @@ def register_view(request):
             subject = 'Aktivujte svoj účet'
             message = f'Ahoj {user.username}, klikni na tento link pre aktiváciu účtu: {link}'
             
-            send_mail(subject, message, 'noreply@tvojweb.sk', [user.email])
+            send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [user.email])
 
             messages.info(request, 'Registrácia úspešná. Skontroluj si e-mail pre aktiváciu účtu.')
             return redirect('login')
@@ -60,7 +60,8 @@ def activate(request, uidb64, token):
         messages.success(request, 'Váš účet bol úspešne aktivovaný! Teraz sa môžete prihlásiť.')
         return redirect('login')
     else:
-        return render(request, 'accounts/activation_invalid.html')
+        messages.error(request, 'Aktivačný odkaz je neplatný alebo už bol použitý.')
+        return redirect('login')
 
 @login_required
 def profil(request):

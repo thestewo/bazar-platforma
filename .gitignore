@@ -9,3 +9,4 @@ MC.mp3
 .vscode/
 .idea/
 .env
+*.sqlite3
