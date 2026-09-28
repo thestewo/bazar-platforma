@@ -508,3 +508,75 @@ img {
 .input-group-text {
     border-color: #495057 !important;
 }
+
+
+
+
+@media (min-width: 768px) {
+    .border-end-md {
+        border-right: 1px solid var(--bs-border-color) !important;
+    }
+}
+@media (max-width: 767.98px) {
+    .border-bottom-sm {
+        border-bottom: 1px solid var(--bs-border-color) !important;
+    }
+}
+
+.img-container-responsive {
+    height: 350px;
+    width: 100%;
+}
+
+.img-container-responsive img {
+    max-height: 330px;
+    width: auto;
+    object-fit: contain;
+}
+
+@media (min-width: 768px) {
+    .img-container-responsive {
+        height: 600px;
+    }
+    .img-container-responsive img {
+        max-height: 580px;
+    }
+}
+
+i.bi, .bi {
+    font-family: 'bootstrap-icons' !important;
+    font-style: normal !important;
+    font-weight: normal !important;
+    font-variant: normal !important;
+    text-transform: none !important;
+    line-height: 1 !important;
+    vertical-align: -.125em;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+
+.card-text, .card-title, .card-body {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+/* Orezanie popisu inzerátu na max 2-3 riadky s trojbodkou */
+.inzerat-card-popis {
+    display: -webkit-box;
+    -webkit-line-clamp: 3; /* Maximálne 3 riadky textu */
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-height: 4.5em; /* Poistka výšky */
+}
+
+/* Orezanie dlhej lokality v karte */
+.inzerat-card-lokalita {
+    max-width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: inline-block;
+    vertical-align: bottom;
+}

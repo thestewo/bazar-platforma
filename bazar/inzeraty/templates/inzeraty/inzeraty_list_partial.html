@@ -26,14 +26,14 @@
                 {% endif %}
 
                 {% if inzerat.lokalita %}
-                <span class="badge bg-light text-dark small badge-small badge-geo">
+                <span class="badge bg-light text-dark small badge-small badge-geo inzerat-card-lokalita">
                     <i class="bi bi-geo-alt-fill me-1"></i>{{ inzerat.lokalita }}
                 </span>
                 {% endif %}
             </div>
 
-            <p class="card-text small text-white-50 flex-grow-1 mt-1">
-                {{ inzerat.popis|truncatewords:6 }}
+            <p class="card-text small text-white-50 flex-grow-1 mt-1 inzerat-card-popis">
+                {{ inzerat.popis }}
             </p>
 
             <div class="mt-2">

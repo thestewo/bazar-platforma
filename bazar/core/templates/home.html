@@ -8,7 +8,7 @@
 <div class="card bg-dark border-secondary shadow-lg mb-5 filter-card">
     <div class="card-body p-4">
         <form method="GET" action="{% url 'home' %}" class="row g-3 align-items-end" id="filterForm">
-            <div class="col-lg-3 col-md-12">
+            <div class="col-lg-3 col-md-6">
                 <label class="form-label text-white-50 small d-block">Typ inzerátu</label>
                 <div class="btn-group w-100" role="group">
                     <input type="radio" class="btn-check" name="typ" id="typ_vsetky" value="" 
@@ -44,7 +44,7 @@
                 </select>
             </div>
 
-            <div class="col-lg-3 col-md-12">
+            <div class="col-lg-3 col-md-6">
                 <label class="form-label text-white-50 small">Cena (€)</label>
                 <div class="input-group">
                     <input type="number" name="min_cena" class="form-control bg-dark text-white border-secondary" 
@@ -54,7 +54,8 @@
                 </div>
             </div>
 
-            <div class="col-lg-5 col-md-8">
+            <!-- 2. RIADOK (4 rovnako široké stĺpce na PC) -->
+            <div class="col-lg-3 col-md-6">
                 <label class="form-label text-white-50 small">Lokalita</label>
                 <div class="input-group">
                     <span class="input-group-text bg-dark border-secondary text-white-50"><i class="bi bi-geo-alt"></i></span>
@@ -66,7 +67,7 @@
                 </div>
             </div>
 
-            <div class="col-lg-3 col-md-4">
+            <div class="col-lg-3 col-md-6">
                 <label class="form-label text-white-50 small">Okolie (km)</label>
                 <div class="input-group">
                     <input type="number" name="r" class="form-control bg-dark text-white border-secondary" 
@@ -75,11 +76,26 @@
                 </div>
             </div>
 
-            <div class="col-lg-4 col-md-12 d-flex gap-2">
+            <div class="col-lg-3 col-md-6">
+                <label class="form-label text-white-50 small">Zoradiť podľa</label>
+                <select name="zoradenie" class="form-select bg-dark text-white border-secondary" onchange="this.form.submit()">
+                    <option value="najnovsie" {% if request.GET.zoradenie == 'najnovsie' or not request.GET.zoradenie %}selected{% endif %}>
+                        Najnovšie
+                    </option>
+                    <option value="cena_asc" {% if request.GET.zoradenie == 'cena_asc' %}selected{% endif %}>
+                        Cena: od najlacnejších
+                    </option>
+                    <option value="cena_desc" {% if request.GET.zoradenie == 'cena_desc' %}selected{% endif %}>
+                        Cena: od najdrahších
+                    </option>
+                </select>
+            </div>
+
+            <div class="col-lg-3 col-md-6 d-flex gap-2">
                 <button type="submit" class="btn btn-primary w-100 fw-bold">
                     <i class="bi bi-funnel-fill me-2"></i>Filtrovať
                 </button>
-                {% if request.GET.q or request.GET.kategoria or request.GET.l or request.GET.r or request.GET.min_cena or request.GET.max_cena or request.GET.typ %}
+                {% if request.GET.q or request.GET.kategoria or request.GET.l or request.GET.r or request.GET.min_cena or request.GET.max_cena or request.GET.typ or request.GET.zoradenie %}
                     <a href="{% url 'home' %}" class="btn btn-outline-danger px-3" title="Zrušiť filtre">
                         <i class="bi bi-x-lg"></i>
                     </a>

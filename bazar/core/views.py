@@ -64,8 +64,9 @@ def home(request):
     min_cena = request.GET.get('min_cena')
     max_cena = request.GET.get('max_cena')
     
-    mesto_hladane = request.GET.get('l') 
-    okruh = request.GET.get('r')         
+    mesto_hladane = request.GET.get('l')
+    okruh = request.GET.get('r')
+    zoradenie = request.GET.get('zoradenie', 'najnovsie')
 
     if q:
         inzeraty = inzeraty.filter(
@@ -112,8 +113,12 @@ def home(request):
         else:
             inzeraty = inzeraty.filter(lokalita__icontains=mesto_hladane)
 
-    inzeraty = inzeraty.order_by('-vytvorene')
-    
+    if zoradenie == 'cena_asc':
+        inzeraty = inzeraty.order_by('cena', '-vytvorene')
+    elif zoradenie == 'cena_desc':
+        inzeraty = inzeraty.order_by('-cena', '-vytvorene')
+    else:
+        inzeraty = inzeraty.order_by('-vytvorene')
     # Paginácia na 16 kusov
     paginator = Paginator(inzeraty, 16)
     page_number = request.GET.get('page', 1)
