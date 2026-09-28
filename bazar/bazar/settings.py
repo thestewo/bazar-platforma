@@ -11,7 +11,7 @@ DEBUG = os.getenv('DEBUG', 'False') == 'True'
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-ALLOWED_HOSTS = ['localhost', '127.0.0.1', 'bazar.gbst.sk']
+ALLOWED_HOSTS = ['localhost', '127.0.0.1', 'bazar.gbst.sk', 'novu.filleck.sk', 'www.novu.filleck.sk', '*']
 
 # Application definition
 
@@ -30,6 +30,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -137,3 +138,13 @@ MESSAGE_TAGS = {
     messages.ERROR: 'danger',
 }
 
+# Dôveryhodné domény pre CSRF ochranu pri formulároch (prihlasovanie, registrácia, inzeráty)
+CSRF_TRUSTED_ORIGINS = [
+    'https://novu.filleck.sk',
+    'https://www.novu.filleck.sk',
+    'https://bazar.gbst.sk',
+]
+
+# Správne rozpoznanie HTTPS protokolu z Nginx/Reverse Proxy
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+USE_X_FORWARDED_HOST = True

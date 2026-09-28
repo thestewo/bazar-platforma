@@ -58,6 +58,7 @@
     {% endif %}
 </div>
 
+<!-- Modal pre úpravu správy -->
 <div class="modal fade" id="editModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content bg-dark text-white border-secondary shadow-lg">
@@ -80,6 +81,7 @@
     </div>
 </div>
 
+<!-- Modal pre fotky -->
 <div class="modal fade" id="imageModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-xl">
         <div class="modal-content bg-transparent border-0">
@@ -93,6 +95,7 @@
     </div>
 </div>
 
+<!-- Modal pre videá -->
 <div class="modal fade" id="videoModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-xl">
         <div class="modal-content bg-transparent border-0">
@@ -105,6 +108,7 @@
     </div>
 </div>
 
+<!-- Modal pre nahlásenie správy -->
 <div class="modal fade" id="reportModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content bg-dark text-white border-secondary shadow-lg">
@@ -135,6 +139,28 @@
                     <button type="submit" class="btn btn-warning text-dark fw-bold">Odoslať nahlásenie</button>
                 </div>
             </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal pre upozornenie o limite príloh -->
+<div class="modal fade" id="limitPrilohModal" tabindex="-1" aria-labelledby="limitPrilohLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content bg-dark text-white border-warning shadow-lg">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title text-warning" id="limitPrilohLabel">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i>Limit príloh prekročený
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Zatvoriť"></button>
+            </div>
+            <div class="modal-body text-center py-4">
+                <i class="bi bi-images text-warning display-4 mb-3 d-block"></i>
+                <p class="fs-5 mb-0" id="limitPrilohSprava">Prekročili ste maximálny limit posielania príloh.</p>
+                <small class="text-muted mt-2 d-block">Skúste to prosím znova o minútu.</small>
+            </div>
+            <div class="modal-footer border-secondary justify-content-center">
+                <button type="button" class="btn btn-warning px-4 fw-bold" data-bs-dismiss="modal">Rozumiem</button>
+            </div>
         </div>
     </div>
 </div>
@@ -187,8 +213,23 @@
 
     let vybraneSubory = [];
 
+    function ukazWarningModal(sprava) {
+        const spravaElem = document.getElementById('limitPrilohSprava');
+        if (spravaElem) spravaElem.innerText = sprava;
+        
+        const modalElement = document.getElementById('limitPrilohModal');
+        const modal = new bootstrap.Modal(modalElement);
+        modal.show();
+    }
+
     function spracujSubory(files) {
         if (!files || files.length === 0) return;
+
+        if (vybraneSubory.length + files.length > 3) {
+            ukazWarningModal("Môžete pridať maximálne 3 prílohy na jedno odoslanie.");
+            return;
+        }
+
         for (let file of files) {
             vybraneSubory.push(file);
         }
@@ -268,45 +309,101 @@
         spracujSubory(e.dataTransfer.files);
     });
 
+    let aktualneKonverzaciaId = konverzaciaId;
+
     if (hlavnyChatForm) {
         hlavnyChatForm.addEventListener('submit', async function(e) {
             e.preventDefault();
             const text = chatInputField.value.trim();
             if (text === "" && vybraneSubory.length === 0) return;
 
+            let dojednaneKonverzaciaId = aktualneKonverzaciaId;
+
             if (text !== "") {
                 const fd = new FormData();
                 fd.append('text', text);
+                if (aktualneKonverzaciaId) {
+                    fd.append('konverzacia_id', aktualneKonverzaciaId);
+                }
                 fd.append('csrfmiddlewaretoken', '{{ csrf_token }}');
-                await fetch(this.action, { method: 'POST', body: fd, headers: {'X-Requested-With': 'XMLHttpRequest'} });
+                const res = await fetch(this.action, { 
+                    method: 'POST', 
+                    body: fd, 
+                    headers: {'X-Requested-With': 'XMLHttpRequest'} 
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.konverzacia_id) {
+                        dojednaneKonverzaciaId = data.konverzacia_id;
+                    }
+                }
                 chatInputField.value = "";
             }
 
             for (let file of vybraneSubory) {
                 const fd = new FormData();
                 fd.append(file.type.startsWith('image/') ? 'obrazok' : 'video', file);
+                if (aktualneKonverzaciaId) {
+                    fd.append('konverzacia_id', aktualneKonverzaciaId);
+                }
                 fd.append('csrfmiddlewaretoken', '{{ csrf_token }}');
-                await fetch(this.action, { method: 'POST', body: fd, headers: {'X-Requested-With': 'XMLHttpRequest'} });
+                const res = await fetch(this.action, { 
+                    method: 'POST', 
+                    body: fd, 
+                    headers: {'X-Requested-With': 'XMLHttpRequest'} 
+                });
+                
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.konverzacia_id) {
+                        dojednaneKonverzaciaId = data.konverzacia_id;
+                    }
+                } else if (res.status === 429) {
+                    const errData = await res.json();
+                    ukazWarningModal(errData.error || "Poslali ste príliš veľa príloh za krátky čas.");
+                    break;
+                }
             }
 
             vybraneSubory = [];
-            vkresliNahľady();
-            if (!konverzaciaId || konverzaciaId === "") { window.location.reload(); } else { nacitajNoveSpravy(); }
+            vykresliNahľady();
+
+            aktualneKonverzaciaId = dojednaneKonverzaciaId;
+            nacitajNoveSpravy();
         });
     }
 
     function nacitajNoveSpravy() {
-        if (!konverzaciaId || document.querySelector('.dropdown-menu.show')) return;
-        fetch("/inzeraty/chat/nacitat/" + konverzaciaId + "/")
-            .then(res => res.status === 404 ? "" : res.text())
-            .then(html => {
-                const box = document.querySelector('.chat-box');
-                if (html.trim() !== "" && box.innerHTML.trim() !== html.trim()) {
-                    const atBottom = box.scrollHeight - box.clientHeight <= box.scrollTop + 50;
-                    box.innerHTML = html;
-                    if (atBottom) box.scrollTop = box.scrollHeight;
+    if (!aktualneKonverzaciaId || aktualneKonverzaciaId === "" || document.querySelector('.dropdown-menu.show')) return;
+    
+    fetch("/inzeraty/chat/nacitat/" + aktualneKonverzaciaId + "/")
+        .then(res => {
+            if (res.status === 404) return null;
+            
+            // Aktualizácia odznaku v navigácii podľa hlavičky zo servera
+            const unreadCount = res.headers.get('X-Unread-Count');
+            if (unreadCount !== null) {
+                const badge = document.getElementById('unread-badge') || document.querySelector('.badge.bg-primary');
+                if (badge) {
+                    if (parseInt(unreadCount) > 0) {
+                        badge.textContent = unreadCount;
+                        badge.style.display = 'inline-block';
+                    } else {
+                        badge.style.display = 'none';
+                    }
                 }
-            });
+            }
+            return res.text();
+        })
+        .then(html => {
+            if (!html) return;
+            const box = document.querySelector('.chat-box');
+            if (html.trim() !== "" && box.innerHTML.trim() !== html.trim()) {
+                const atBottom = box.scrollHeight - box.clientHeight <= box.scrollTop + 50;
+                box.innerHTML = html;
+                if (atBottom) box.scrollTop = box.scrollHeight;
+            }
+        });
     }
     setInterval(nacitajNoveSpravy, 3000);
 
@@ -360,7 +457,6 @@
         });
     });
 
-    // JAVASCRIPT: Funkcie pre nahlásenie správy
     function otvorReport(id) {
         document.getElementById('reportReason').value = "";
         document.getElementById('reportKomentar').value = "";
@@ -386,7 +482,7 @@
 </script>
 
 <script>
-// Predchádzajúci kód pre nsfwModel filter zostáva bez zmeny
+// Kód pre nsfwModel filter
 async function skontrolujChatObrazok(file) {
     if (!nsfwModel) {
         nsfwModel = await nsfw.load();

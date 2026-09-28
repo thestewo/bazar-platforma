@@ -140,9 +140,14 @@
                                             <a href="{% url 'verejny_profil' inzerat.autor.username %}" class="text-info text-decoration-none fw-bold text-truncate fs-6">{{ inzerat.autor.username }}</a>
                                             
                                             {% if inzerat.autor.profile.je_rizikovy %}
-                                                <i class="bi bi-exclamation-triangle-fill text-warning fs-6" 
-                                                style="cursor: help;" 
-                                                title="Upozornenie: Tento používateľ bol viackrát nahlásený komunitou za porušenie pravidiel. Zvýšte opatrnosť!"></i>
+                                                <i class="bi bi-exclamation-triangle-fill text-warning fs-6 rizikovy-popover" 
+                                                style="cursor: pointer;" 
+                                                tabindex="0"
+                                                data-bs-toggle="popover" 
+                                                data-bs-trigger="focus"
+                                                data-bs-placement="top"
+                                                data-bs-custom-class="warning-popover"
+                                                data-bs-content="Upozornenie: Tento používateľ bol viackrát nahlásený komunitou za porušenie pravidiel. Zvýšte opatrnosť!"></i>
                                             {% endif %}
                                         </div>
                                     </div>
@@ -266,5 +271,13 @@ document.getElementById('reportForm').addEventListener('submit', async function(
         errorDiv.classList.remove('d-none');
     }
 });
+
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Inicializácia Bootstrap Popoverov (pre zobrazenie žltej bubliny po kliknutí)
+    const popoverTriggerList = document.querySelectorAll('[data-bs-toggle="popover"]');
+    [...popoverTriggerList].map(popoverTriggerEl => new bootstrap.Popover(popoverTriggerEl));
+});
+
 </script>
 {% endblock %}

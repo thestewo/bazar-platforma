@@ -8,8 +8,8 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="{% static 'css/style.css' %}">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@2.1.0/dist/tf.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/nsfwjs@2.4.5/dist/browser/nsfwjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.11.0/dist/tf.min.js"></script>
+    <script src="https://unpkg.com/nsfwjs@2.4.2/dist/nsfwjs.min.js"></script>
   </head>
   <body>
 
@@ -71,7 +71,7 @@
                <a href="{% url 'moje_chaty' %}" class="nav-link position-relative">
                       Správy
               {% if unread_count > 0 %}
-              <span class="position-absolute start-100 translate-middle badge rounded-pill bg-primary d-inline-flex align-items-center justify-content-center" 
+              <span id="unread-badge" class="position-absolute start-100 translate-middle badge rounded-pill bg-primary d-inline-flex align-items-center justify-content-center" 
               style="width: 18px; height: 18px; font-size: 0.65rem; margin-top: 1px; margin-left: -3px;">
               {{ unread_count }}
               </span>
@@ -112,20 +112,21 @@
     </div>
 
   <footer class="py-4 mt-auto border-top border-secondary">
-      <div class="container text-center text-muted">
-          <p class="mb-2">
-              &copy; <span id="current-year"></span> Jakub Dzúr a Richard Mágyel. Všetky práva vyhradené.
-          </p>
-          <div class="mb-2">
-              <a href="{% url 'vop' %}" class="text-muted text-decoration-none mx-2 small">Obchodné podmienky</a> | 
-              <a href="{% url 'gdpr' %}" class="text-muted text-decoration-none mx-2 small">GDPR</a> |
-              <a href="#" class="text-info text-decoration-none mx-2 small fw-bold" data-bs-toggle="modal" data-bs-target="#ticketModal">
+    <div class="container text-center text-muted">
+        <p class="mb-2">
+            &copy; <span id="current-year"></span> Jakub Dzúr a Richard Mágyel. Všetky práva vyhradené.<br>
+            <small class="text-muted">Stránka beží na serveroch spoločnosti Regiotel, s. r. o.</small>
+        </p>
+        <div class="mb-2">
+            <a href="{% url 'vop' %}" class="text-muted text-decoration-none mx-2 small">Obchodné podmienky</a> | 
+            <a href="{% url 'gdpr' %}" class="text-muted text-decoration-none mx-2 small">GDPR</a> |
+            <a href="#" class="text-info text-decoration-none mx-2 small fw-bold" data-bs-toggle="modal" data-bs-target="#ticketModal">
                 <i class="bi bi-exclamation-circle-fill me-1"></i>Nahlásiť chybu / Návrh
-              </a>
-          </div>
-          <small class="d-block mt-2">NOVU</small>
-      </div>
-  </footer>
+            </a>
+        </div>
+        <small class="d-block mt-2">NOVU</small>
+    </div>
+</footer>
 
 
     <div class="modal fade" id="videoModal" tabindex="-1" aria-hidden="true">

@@ -9,18 +9,49 @@ from google.genai import types
 # Globálna inicializácia nového klienta (automaticky si vezme GEMINI_API_KEY z prostredia)
 client = genai.Client()
 
+def zavolaj_gemini_s_fallbackom(contents, config=None):
+    """
+    Bezpečne zavolá primárny alebo záložný model.
+    Vráti priamo text odpovede (str), alebo None ak oba pokusy zlyhajú.
+    """
+    primarny_model = 'gemini-2.5-flash'
+    zalozny_model = 'gemini-2.5-flash-lite'
+
+    # 1. Pokus: Primárny model
+    try:
+        if config:
+            res = client.models.generate_content(model=primarny_model, contents=contents, config=config)
+        else:
+            res = client.models.generate_content(model=primarny_model, contents=contents)
+        if res and hasattr(res, 'text') and res.text:
+            return res.text
+    except Exception as e:
+        print(f"DEBUG: Primárny model ({primarny_model}) zlyhal: {e}. Skúšam záložný...")
+
+    # 2. Pokus: Záložný model
+    try:
+        if config:
+            res = client.models.generate_content(model=zalozny_model, contents=contents, config=config)
+        else:
+            res = client.models.generate_content(model=zalozny_model, contents=contents)
+        if res and hasattr(res, 'text') and res.text:
+            return res.text
+    except Exception as e2:
+        print(f"DEBUG: Aj záložný model ({zalozny_model}) zlyhal: {e2}")
+
+    return None
+
 def ziskaj_ai_analyzu(inzerat):
-    # 1. Lokalizované vyhľadávanie
     search_query = f"{inzerat.nazov} cena v eurach slovensko"
     web_context = ""
     
     try:
-        with DDGS() as ddgs:
-            results = list(ddgs.text(search_query, region='sk-sk', max_results=3))
+        with DDGS(timeout=5) as ddgs:
+            results = list(ddgs.text(search_query, region='sk-sk', max_results=2))
             for r in results:
-                web_context += f"\nZdroj: {r['title']} - {r['body']}"
+                web_context += f"\nZdroj: {r.get('title', '')} - {r.get('body', '')}"
     except Exception as e:
-        print(f"DEBUG: Chyba DuckDuckGo: {e}")
+        print(f"DEBUG: Chyba/Timeout DuckDuckGo: {e}")
         web_context = "Nepodarilo sa získať aktuálne slovenské dáta z webu."
 
     prompt = f"""
@@ -75,17 +106,15 @@ def ziskaj_ai_analyzu(inzerat):
             except Exception as e:
                 print(f"DEBUG: Nepodarilo sa otvoriť dodatočný obrázok pre analýzu: {e}")
 
-    try:
-        # Volanie cez novú knižnicu google-genai
-        response = client.models.generate_content(
-            model='gemini-3.1-flash-lite',
-            contents=content,
-            config=types.GenerateContentConfig(temperature=0.2)
-        )
-        return response.text
-    except Exception as e:
-        print(f"DEBUG: Chyba Gemini pri analýze: {e}")
-        return "AI analýza momentálne nie je k dispozícii kvôli vyčerpaniu limitov."
+    text_odpoved = zavolaj_gemini_s_fallbackom(
+        contents=content,
+        config=types.GenerateContentConfig(temperature=0.2)
+    )
+
+    if text_odpoved:
+        return text_odpoved
+    
+    return "AI analýza momentálne nie je k dispozícii kvôli chybe na strane modelu."
 
 def vygeneruj_skryte_tagy(inzerat):
     if not inzerat.popis or len(inzerat.popis) < 150:
@@ -105,16 +134,15 @@ def vygeneruj_skryte_tagy(inzerat):
     """
 
     try:
-        response = client.models.generate_content(
-            model='gemini-3.1-flash-lite',
-            contents=prompt
-        )
-        tagy = response.text.strip()
-        print(f"DEBUG: AI vygenerovalo tagy: {tagy}")
-        return tagy
+        text_odpoved = zavolaj_gemini_s_fallbackom(contents=prompt)
+        if text_odpoved:
+            tagy = text_odpoved.strip()
+            print(f"DEBUG: AI vygenerovalo tagy: {tagy}")
+            return tagy
     except Exception as e:
         print(f"DEBUG: Chyba pri generovaní tagov: {e}")
-        return ""
+    
+    return ""
 
 # INTERNÝ BLACKLIST
 LOKALNY_BLACKLIST = [
@@ -167,24 +195,24 @@ def skontroluj_obsah_cez_gemini(text: str, obrazky_list: list = None) -> dict:
                     print(f"Chyba spracovania obrázka pre Gemini: {e}")
 
     try:
-        response = client.models.generate_content(
-            model='gemini-3.1-flash-lite',
+        text_odpoved = zavolaj_gemini_s_fallbackom(
             contents=obsah_pre_gemini,
             config=types.GenerateContentConfig(
                 system_instruction=SYSTEM_PROMPT,
                 response_mime_type="application/json",
-            ),
+            )
         )
-        return json.loads(response.text)
+        if text_odpoved:
+            return json.loads(text_odpoved)
     except Exception as e:
-        print(f"Gemini API zlyhalo (Tokeny minulé alebo výpadok): {e}")
-        # BEZPEČNOSTNÁ POISTKA: Ak minieš tokeny, inzerát ide automaticky do Karantény a NESCHVÁLI sa!
-        return {
-            "schvalene": False,
-            "status": "Karanténa",
-            "dovod": "Chyba systému kontroly (API nedostupné).",
-            "kategoria_problemu": "ine"
-        }
+        print(f"Gemini API / JSON parse zlyhalo: {e}")
+
+    return {
+        "schvalene": False,
+        "status": "Karanténa",
+        "dovod": "Chyba systému kontroly (API nedostupné).",
+        "kategoria_problemu": "ine"
+    }
 
 def hlavna_kontrola_obsahu(text: str, obrazky_list: list = None) -> dict:
     if obsahuje_zakazane_slova(text):

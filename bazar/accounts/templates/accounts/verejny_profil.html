@@ -5,10 +5,15 @@
         <div class="card bg-dark p-4 shadow-sm border-secondary text-white">
             <div class="d-flex align-items-center gap-2 mb-2">
                 <h3>{{ predajca.username }}</h3>
-                {% if predajca.profile.je_rizikovy %}
-                    <i class="bi bi-exclamation-triangle-fill text-warning fs-4" 
-                    style="cursor: help;" 
-                    title="Upozornenie: Tento používateľ bol viackrát nahlásený komunitou za porušenie pravidiel. Zvýšte opatrnosť!"></i>
+                {% if predajca.profile.je_rizikovy or predajca.je_rizikovy %}
+                    <i class="bi bi-exclamation-triangle-fill text-warning fs-4 rizikovy-popover" 
+                    style="cursor: pointer;" 
+                    tabindex="0"
+                    data-bs-toggle="popover" 
+                    data-bs-trigger="focus"
+                    data-bs-placement="top"
+                    data-bs-custom-class="warning-popover"
+                    data-bs-content="Upozornenie: Tento používateľ bol viackrát nahlásený komunitou za porušenie pravidiel. Zvýšte opatrnosť!"></i>
                 {% endif %}
             </div>
 
@@ -101,5 +106,11 @@
 {% include 'accounts/includes/profil_modals.html' %}
 
 <script src="{% static 'js/profil.js' %}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const popoverTriggerList = document.querySelectorAll('[data-bs-toggle="popover"]');
+    [...popoverTriggerList].map(popoverTriggerEl => new bootstrap.Popover(popoverTriggerEl));
+});
+</script>
 
 {% endblock %}

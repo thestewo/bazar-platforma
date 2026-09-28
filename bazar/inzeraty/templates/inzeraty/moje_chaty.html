@@ -7,7 +7,7 @@
             {% with posledna_sprava=chat.spravy.last %}
             {# Zistíme, či má svietiť na modro: správa nie je od nás A je neprečítaná #}
             {% if posledna_sprava and not posledna_sprava.precitane and posledna_sprava.odosielatel != user %}
-                <a href="{% url 'chat_detail' chat.inzerat.id %}" 
+                <a href="{% url 'chat_detail' chat.inzerat.id %}?kupujuci_id={{ chat.kupujuci.id }}" 
                    class="list-group-item list-group-item-action bg-dark text-white border-primary mb-2 shadow" 
                    style="border-left: 5px solid #0d6efd !important;">
                     <div class="d-flex justify-content-between align-items-center">
@@ -25,7 +25,7 @@
                 </a>
             {% else %}
                 {# Klasická prečítaná konverzácia #}
-                <a href="{% url 'chat_detail' chat.inzerat.id %}" 
+                <a href="{% url 'chat_detail' chat.inzerat.id %}?kupujuci_id={{ chat.kupujuci.id }}" 
                    class="list-group-item list-group-item-action bg-dark text-white border-secondary mb-2 opacity-75">
                     <strong>Inzerát: {{ chat.inzerat.nazov }}</strong><br>
                     <small class="text-muted">
@@ -40,10 +40,8 @@
     </div>
 </div>
 <script>
-    // Tento kód zistí, či sa používateľ vrátil na stránku cez tlačidlo "Späť"
     window.addEventListener('pageshow', function(event) {
         if (event.persisted || (typeof window.performance != 'undefined' && window.performance.navigation.type === 2)) {
-            // Ak áno, vynúti refresh stránky, aby zmizli modré notifikácie
             window.location.reload();
         }
     });

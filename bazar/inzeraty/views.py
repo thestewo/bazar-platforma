@@ -348,14 +348,13 @@ def chat_detail(request, inzerat_id):
     inzerat = get_object_or_404(Inzerat, id=inzerat_id) 
     kupujuci_id = request.GET.get('kupujuci_id')
     
-    # Ak je používateľ admin a v URL posielame ID kupujúceho:
-    if request.user.is_staff and kupujuci_id:
+    # 1. Nájdenie správnej konverzácie
+    if kupujuci_id:
         konverzacia = Konverzacia.objects.filter(
             inzerat=inzerat, 
             kupujuci_id=kupujuci_id
         ).first()
     else:
-        # Štandardná logika pre normálnych používateľov
         konverzacia = Konverzacia.objects.filter(
             inzerat=inzerat
         ).filter(
@@ -364,16 +363,23 @@ def chat_detail(request, inzerat_id):
         
     spravy = []
     if konverzacia:
-        # Označiť správy ako prečítané len vtedy, ak si chat pozerá bežný účastník (nie admin pri kontrole)
         if not request.user.is_staff:
+            # Označíme neprečítané správy pre daného používateľa ako prečítané
             konverzacia.spravy.filter(precitane=False).exclude(odosielatel=request.user).update(precitane=True)
             
         spravy = konverzacia.spravy.all().order_by('poslane')
-        
+    
+    # Prepočítanie neprečítaných správ pre aktuálneho používateľa
+    unread_count = Sprava.objects.filter(
+        Q(konverzacia__kupujuci=request.user) | Q(konverzacia__predajca=request.user),
+        precitane=False
+    ).exclude(odosielatel=request.user).distinct().count()
+
     return render(request, 'inzeraty/chat_detail.html', {
         'inzerat': inzerat, 
         'konverzacia': konverzacia, 
-        'spravy': spravy
+        'spravy': spravy,
+        'unread_count': unread_count
     })
 
 @login_required
@@ -385,23 +391,76 @@ def moje_chaty(request):
 def poslat_spravu(request, inzerat_id):
     inzerat = get_object_or_404(Inzerat, id=inzerat_id)
     if request.method == 'POST':
-        konverzacia = Konverzacia.objects.filter(inzerat=inzerat).filter(Q(kupujuci=request.user) | Q(predajca=request.user)).first()
+        konverzacia_id = request.POST.get('konverzacia_id')
+        
+        # 1. Ak máme ID konverzácie, načítame presne tú
+        if konverzacia_id:
+            konverzacia = Konverzacia.objects.filter(
+                id=konverzacia_id, 
+                inzerat=inzerat
+            ).filter(Q(kupujuci=request.user) | Q(predajca=request.user)).first()
+        else:
+            # 2. Ak ID nemáme (nový chat z pohľadu kupujúceho), hľadáme konverzáciu kupujúceho
+            konverzacia = Konverzacia.objects.filter(
+                inzerat=inzerat, 
+                kupujuci=request.user
+            ).first()
+
         text = request.POST.get('text', '').strip()
-        if not text and not request.FILES.get('obrazok') and not request.FILES.get('video'):
+        obrazok = request.FILES.get('obrazok')
+        video = request.FILES.get('video')
+
+        if not text and not obrazok and not video:
             return JsonResponse({'status': 'empty'}, status=400)
+
+        # --- LIMIT PRÍLOH (RATE LIMITING) ---
+        if obrazok or video:
+            cache_key = f"attachment_limit_{request.user.id}"
+            pocet_priloh = cache.get(cache_key, 0)
+
+            if pocet_priloh >= 5:
+                return JsonResponse({'error': 'Poslali ste príliš veľa príloh. Počkajte minútu.'}, status=429)
+
+            cache.set(cache_key, pocet_priloh + 1, timeout=60)
+
+        # Ak konverzácia neexistuje a píše kupujúci, vytvoríme ju
         if not konverzacia:
+            if request.user == inzerat.autor:
+                return JsonResponse({'error': 'Predajca nemôže začať konverzáciu sám so sebou.'}, status=400)
             konverzacia = Konverzacia.objects.create(inzerat=inzerat, predajca=inzerat.autor, kupujuci=request.user)
+
         sprava = Sprava.objects.create(
             konverzacia=konverzacia, odosielatel=request.user, text=text,
-            obrazok=request.FILES.get('obrazok'), video=request.FILES.get('video')
+            obrazok=obrazok, video=video
         )
-        return JsonResponse({'status': 'success', 'cas': sprava.poslane.strftime("%H:%M")})
+        return JsonResponse({
+            'status': 'success', 
+            'cas': sprava.poslane.strftime("%H:%M"),
+            'konverzacia_id': konverzacia.id
+        })
     return JsonResponse({'status': 'error'}, status=400)
+
 
 @login_required
 def nacitat_spravy(request, konverzacia_id):
-    spravy = Sprava.objects.filter(konverzacia_id=konverzacia_id).order_by('poslane')
-    return render(request, 'inzeraty/chat_messages_partial.html', {'spravy': spravy, 'user': request.user})
+    konverzacia = get_object_or_404(Konverzacia, id=konverzacia_id)
+    
+    # Označíme správy ako prečítané
+    if not request.user.is_staff and (konverzacia.kupujuci == request.user or konverzacia.predajca == request.user):
+        konverzacia.spravy.filter(precitane=False).exclude(odosielatel=request.user).update(precitane=True)
+
+    spravy = konverzacia.spravy.all().order_by('poslane')
+    
+    # Zistíme aktuálny celkový počet neprečítaných správ pre používateľa v celom systéme
+    unread_count = Sprava.objects.filter(
+        Q(konverzacia__kupujuci=request.user) | Q(konverzacia__predajca=request.user),
+        precitane=False
+    ).exclude(odosielatel=request.user).distinct().count()
+
+    response = render(request, 'inzeraty/chat_messages_partial.html', {'spravy': spravy, 'user': request.user})
+    # Pošleme aktuálny počet neprečítaných správ v HTTP hlavičke
+    response['X-Unread-Count'] = str(unread_count)
+    return response
 
 @login_required
 def zmazat_spravu(request, sprava_id):
@@ -409,9 +468,15 @@ def zmazat_spravu(request, sprava_id):
     if request.method == 'POST':
         konverzacia = sprava.konverzacia
         sprava.delete()
+        
         if not konverzacia.spravy.exists():
             konverzacia.delete()
             return JsonResponse({'status': 'conversation_deleted'}, status=200)
+            
+        # Po zmazaní vlastnej správy označíme prípadné doručené správy ako prečítané
+        if not request.user.is_staff:
+            konverzacia.spravy.filter(precitane=False).exclude(odosielatel=request.user).update(precitane=True)
+            
         return HttpResponse(status=200)
     return HttpResponse(status=400)
 

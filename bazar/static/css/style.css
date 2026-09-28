@@ -259,6 +259,20 @@ img {
     background: #555; 
 }
 
+/* Vlastný žltý popover */
+.warning-popover {
+    --bs-popover-bg: #ffc107;
+    --bs-popover-body-color: #000;
+    --bs-popover-border-color: #e0a800;
+    font-weight: 600;
+    font-size: 0.85rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.warning-popover .popover-arrow::after {
+    --bs-popover-bg: #ffc107;
+}
+
 /* ==========================================================================
    DETAIL INZERÁTU: Galéria, Náhľady a Foto Overlay
    ========================================================================== */

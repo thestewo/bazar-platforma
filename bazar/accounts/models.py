@@ -15,7 +15,7 @@ class Profile(models.Model):
     # --- PRIDANÁ FUNKCIA PRE KONTROLU NAHLÁSENÍ ---
     @property
     def je_rizikovy(self):
-        """Vráti True, ak má používateľ dokopy 3 alebo viac nahlásení (profil + inzeráty + správy)"""
+        """Vráti True, ak má používateľ dokopy 5 alebo viac nahlásení (profil + inzeráty + správy)"""
         # Keďže nemôžeme importovať Report hore kvôli cyklickému importu, importujeme ho priamo tu
         from .models import Report
         
@@ -25,7 +25,7 @@ class Profile(models.Model):
         pocet_nahlaseni_sprav = Report.objects.filter(sprava__odosielatel=self.user).count()
         
         celkovo = pocet_nahlaseni_profilu + pocet_nahlaseni_inzeratov + pocet_nahlaseni_sprav
-        return celkovo >= 3 
+        return celkovo >= 5 
 
 
 # Tieto funkcie automaticky vytvoria profil, keď sa zaregistruje nový User
