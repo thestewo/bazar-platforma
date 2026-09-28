@@ -1,17 +1,81 @@
 :root {
-    --bs-body-bg: #0;
+    --bs-body-bg: #121212;
     --bs-body-color: #ffffff;
-    --bs-navbar-bg: #21252985;
+    --bs-navbar-bg: #212529;
+    --bs-navbar-border: #2c3237;
 }
+
+/* Základná navigácia pre všetky zariadenia */
 .navbar {
     background-color: var(--bs-navbar-bg) !important;
     box-shadow: 0 2px 10px rgba(33, 37, 41, 0.5);
     padding: 15px 0;
 }
+
 .navbar-brand {
     font-weight: 800;
     color: #0080d4 !important;
     letter-spacing: -1px;
+}
+
+/* Odkazy v navigácii */
+.navbar-nav .nav-link {
+    color: #e0e0e0 !important;
+    font-weight: 500;
+    transition: color 0.2s ease;
+}
+
+.navbar-nav .nav-link:hover {
+    color: #ffffff !important;
+}
+
+/* 📱 IBA MOBILY (obrazovky užšie ako 992px) */
+@media (max-width: 991.98px) {
+    .navbar-collapse {
+        background-color: #1e2227 !important; /* Štýlové tmavšie pozadie */
+        border: 1px solid var(--bs-navbar-border);
+        border-radius: 12px;
+        padding: 16px;
+        margin-top: 12px;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5); /* Tieň oddeľujúci menu od filtra */
+    }
+
+    .navbar-nav .nav-link {
+        padding: 10px 14px !important;
+        border-radius: 8px;
+    }
+
+    .navbar-nav .nav-link:hover {
+        background-color: rgba(255, 255, 255, 0.05);
+    }
+}
+
+/* 💻 IBA POČÍTAČE (obrazovky 992px a širšie) */
+@media (min-width: 992px) {
+    .navbar-collapse {
+        background-color: transparent !important;
+        border: none !important;
+        padding: 0 !important;
+        margin-top: 0 !important;
+        box-shadow: none !important;
+    }
+}
+
+/* Dropdown menu (pre tlačidlá ako Profil / Kontakt po kliknutí) */
+.dropdown-menu {
+    background-color: #1e2227 !important;
+    border: 1px solid var(--bs-navbar-border);
+    border-radius: 10px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+}
+
+.dropdown-item {
+    color: #e0e0e0 !important;
+}
+
+.dropdown-item:hover {
+    background-color: #0080d4 !important;
+    color: #ffffff !important;
 }
 
 .card {
