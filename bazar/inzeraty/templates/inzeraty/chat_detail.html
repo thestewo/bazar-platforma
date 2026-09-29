@@ -369,18 +369,17 @@
             vykresliNahľady();
 
             aktualneKonverzaciaId = dojednaneKonverzaciaId;
-            nacitajNoveSpravy();
+            nacitajNoveSpravy(true);
         });
     }
 
-    function nacitajNoveSpravy() {
+    function nacitajNoveSpravy(vynutitScroll = false) {
     if (!aktualneKonverzaciaId || aktualneKonverzaciaId === "" || document.querySelector('.dropdown-menu.show')) return;
     
     fetch("/inzeraty/chat/nacitat/" + aktualneKonverzaciaId + "/")
         .then(res => {
             if (res.status === 404) return null;
             
-            // Aktualizácia odznaku v navigácii podľa hlavičky zo servera
             const unreadCount = res.headers.get('X-Unread-Count');
             if (unreadCount !== null) {
                 const badge = document.getElementById('unread-badge') || document.querySelector('.badge.bg-primary');
@@ -401,7 +400,11 @@
             if (html.trim() !== "" && box.innerHTML.trim() !== html.trim()) {
                 const atBottom = box.scrollHeight - box.clientHeight <= box.scrollTop + 50;
                 box.innerHTML = html;
-                if (atBottom) box.scrollTop = box.scrollHeight;
+                
+                // Ak bol používateľ dole LALEBO odoslal novú správu, posunieme chat nadol
+                if (atBottom || vynutitScroll) {
+                    posunChatNadol();
+                }
             }
         });
     }
@@ -515,5 +518,18 @@ if (chatObrazokInput) {
         }
     });
 }
+
+// Funkcia pre automatické posunutie chatu nadol
+function posunChatNadol() {
+    const box = document.querySelector('.chat-box');
+    if (box) {
+        box.scrollTop = box.scrollHeight;
+    }
+}
+
+// Spustí sa okamžite po načítaní stránky
+document.addEventListener('DOMContentLoaded', function() {
+    posunChatNadol();
+});
 </script>
 {% endblock %}

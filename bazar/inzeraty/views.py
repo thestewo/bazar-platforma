@@ -47,23 +47,36 @@ def _bezpecne_zmaz_subor(file_field):
             print(f"Chyba pri mazaní súboru z disku: {e}")
 
 def ziskaj_suradnice(mesto_text):
-    if not mesto_text:
+    if not mesto_text or not mesto_text.strip():
         return None, None, None
     try:
+        # Odstránili sme striktný &featuretype=settlement pre lepšie vyhľadávanie bez diakritiky
         url = (
             f"https://nominatim.openstreetmap.org/search?"
-            f"format=json&q={mesto_text}&limit=1&addressdetails=1"
-            f"&accept-language=sk&countrycodes=sk&featuretype=settlement"
+            f"format=json&q={requests.utils.quote(mesto_text.strip())}&limit=1&addressdetails=1"
+            f"&accept-language=sk&countrycodes=sk"
         )
         response = requests.get(url, headers={'User-Agent': 'NOVU_App_Educational'}, timeout=5)
         data = response.json()
-        if data:
+        
+        if data and len(data) > 0:
             lat, lon = float(data[0]['lat']), float(data[0]['lon'])
             addr = data[0].get('address', {})
-            pekny_nazov = addr.get('city') or addr.get('town') or addr.get('village') or addr.get('municipality') or addr.get('hamlet')
-            return lat, lon, pekny_nazov or data[0].get('display_name', '').split(',')[0]
+            
+            # Nájdeme oficiálny názov mesta/obce
+            pekny_nazov = (
+                addr.get('city') or 
+                addr.get('town') or 
+                addr.get('village') or 
+                addr.get('municipality') or 
+                addr.get('hamlet') or 
+                addr.get('county') or
+                data[0].get('display_name', '').split(',')[0].strip()
+            )
+            return lat, lon, pekny_nazov
     except Exception as e:
-        print(f"Chyba pri získavaní súradníc: {e}")
+        print(f"Chyba pri získavaní súradníc pre '{mesto_text}': {e}")
+        
     return None, None, None
 
 def zisti_odhad_lokality(request):
@@ -131,7 +144,20 @@ def pridat_inzerat(request):
                 with transaction.atomic():
                     inzerat = form.save(commit=False)
                     inzerat.autor = request.user
-                    inzerat.lokalita = request.POST.get('lokalita', '')
+                    
+                    # OPRAVA LOKALITY: Získanie súradníc a oficiálneho názvu s diakritikou
+                    surova_lokalita = request.POST.get('lokalita', '')
+                    if surova_lokalita and surova_lokalita.strip():
+                        lat, lon, pekny_nazov = ziskaj_suradnice(surova_lokalita.strip())
+                        if lat and lon and pekny_nazov:
+                            inzerat.lat = lat
+                            inzerat.lon = lon
+                            inzerat.lokalita = pekny_nazov
+                        else:
+                            inzerat.lokalita = surova_lokalita.strip().split(',')[0].strip()
+                    else:
+                        inzerat.lokalita = surova_lokalita
+
                     inzerat.status = status
                     inzerat.dovod_zamietnutia = dovod_zamietnutia
                     inzerat.kontrola_zlyhala = kontrola_zlyhala
@@ -189,12 +215,10 @@ def upravit_inzerat(request, pk):
             kontrola_zlyhala = inzerat.kontrola_zlyhala
 
             if vyzaduje_ai_kontrolu:
-                # Pripravíme budúci stav textu z formulára
                 nazov = form.cleaned_data.get('nazov', '')
                 popis = form.cleaned_data.get('popis', '')
                 skumany_text = f"Názov: {nazov}\nPopis: {popis}"
                 
-                # OPRAVA: Posielame na AI kontrolu výhradne IBA nové fotky z requestu, staré netreba znova skenovať
                 ai_list_fotiek = []
                 
                 if hlavna_fotka_subor:
@@ -208,7 +232,6 @@ def upravit_inzerat(request, pk):
                         except: pass
                         ai_list_fotiek.append(f)
 
-                # Spustíme kontrolu v pamäti PRED uložením zmien
                 try:
                     vysledok_kontroly = hlavna_kontrola_obsahu(skumany_text, ai_list_fotiek)
                     status = vysledok_kontroly.get('status', 'Schválený')
@@ -219,11 +242,10 @@ def upravit_inzerat(request, pk):
                     dovod_zamietnutia = "AI nedostupné počas úpravy"
                     kontrola_zlyhala = True
 
-            # Ak AI úpravu zamietne, ihneď ju zrušíme. V databáze aj na disku zostáva starý inzerát nedotknutý.
             if status == "Zamietnutý":
                 return JsonResponse({'error': f"Inzerát bol po úprave zamietnutý cenzúrou: {dovod_zamietnutia}"}, status=400)
 
-            # 2. Ak úprava prešla, až teraz prepíšeme dáta v DB a uložíme nové súbory
+            # 2. Ak úprava prešla, zapíšeme dáta v DB
             stare_fotky_na_zmazanie_po_commite = []
             try:
                 with transaction.atomic():
@@ -238,36 +260,34 @@ def upravit_inzerat(request, pk):
                             stare_fotky_na_zmazanie_po_commite.append(stara_hlavna_fotka)
                         inzerat.obrazok = hlavna_fotka_subor
 
+                    # OPRAVA LOKALITY: Aktualizácia súradníc a oficiálneho názvu s diakritikou
+                    if surova_lokalita and surova_lokalita.strip() and (surova_lokalita.strip() != stara_lokalita or inzerat.lat is None):
+                        lat, lon, pekny_nazov = ziskaj_suradnice(surova_lokalita.strip())
+                        if lat and lon and pekny_nazov:
+                            inzerat.lat = lat
+                            inzerat.lon = lon
+                            inzerat.lokalita = pekny_nazov
+                        else:
+                            inzerat.lokalita = surova_lokalita.strip().split(',')[0].strip()
+                    
                     inzerat.save()
 
                     if list_vedlajsich_fotiek:
-                        # Odložíme staré vedľajšie fotky na zmazanie z disku
                         for stara_foto in inzerat.dodatocne_obrazky.all():
                             if stara_foto.obrazok:
                                 stare_fotky_na_zmazanie_po_commite.append(stara_foto.obrazok)
                         inzerat.dodatocne_obrazky.all().delete()
 
-                        # Zapíšeme nové
                         for f in list_vedlajsich_fotiek:
                             try: f.seek(0)
                             except: pass
                             InzeratObrazok.objects.create(inzerat=inzerat, obrazok=f)
 
-                    # Spracovanie lokality
-                    if surova_lokalita and surova_lokalita != stara_lokalita:
-                        lat, lon, pekny_nazov = ziskaj_suradnice(surova_lokalita)
-                        if lat and lon:
-                            inzerat.lat, inzerat.lon, inzerat.lokalita = lat, lon, pekny_nazov
-                        else:
-                            inzerat.lokalita = surova_lokalita.split(',')[0].strip()
-                    
                     if 'vygeneruj_skryte_tagy' in globals():
                         inzerat.skryte_tagy = vygeneruj_skryte_tagy(inzerat)
                     
                     inzerat.save()
 
-                # --- ZÓNA ÚSPECHU ---
-                # Až keď celý zápis úspešne zbehol (commit), bezpečne vymažeme staré prepísané fotky
                 gc.collect()
                 for stara_f in stare_fotky_na_zmazanie_po_commite:
                     _bezpecne_zmaz_subor(stara_f)
