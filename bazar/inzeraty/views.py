@@ -1,17 +1,13 @@
-import os
-import requests
-import traceback
-import gc  # Uvoľnenie pamäte (odomknutie súborov pred mazaním)
+import traceback, gc, requests
+from datetime import timedelta
 from django.conf import settings
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
-from django.core.exceptions import PermissionDenied
 from django.http import HttpResponse, JsonResponse
 from django.db.models import Q
 from django.core.cache import cache
 from django.views.decorators.http import require_POST
 from django.utils import timezone
-from datetime import timedelta
 from django.db import transaction
 from django.views.decorators.csrf import csrf_protect
 from django.urls import reverse
@@ -25,58 +21,42 @@ from accounts.models import Report
 # --- POMOCNÉ FUNKCIE ---
 # ==========================================================================
 
-@csrf_protect
-def vymazat_fotku_ajax(request, fotka_id):
-    if request.method == 'POST':
-        fotka = get_object_or_404(InzeratObrazok, id=fotka_id)
-        if fotka.inzerat.autor != request.user:
-            return JsonResponse({'success': False, 'error': 'Nemáš právo na túto akciu'}, status=403)
-        if fotka.obrazok: 
-            _bezpecne_zmaz_subor(fotka.obrazok)
-        fotka.delete()
-        return JsonResponse({'success': True})
-    return JsonResponse({'success': False, 'error': 'Neplatná metóda'}, status=400)
-
 def _bezpecne_zmaz_subor(file_field):
-    """Pomocná funkcia na okamžité bezpečné vymazanie súboru a vyčistenie ImageKit cache"""
+    """Okamžité bezpečné vymazanie súboru z disku a vyčistenie streamov."""
     if file_field:
         try:
-            gc.collect()  # Vynútime Python, aby zatvoril všetky streamy k súboru
+            gc.collect()
             file_field.delete(save=False)
         except Exception as e:
             print(f"Chyba pri mazaní súboru z disku: {e}")
+
+@csrf_protect
+def vymazat_fotku_ajax(request, fotka_id):
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'Neplatná metóda'}, status=400)
+    fotka = get_object_or_404(InzeratObrazok, id=fotka_id)
+    if fotka.inzerat.autor != request.user:
+        return JsonResponse({'success': False, 'error': 'Nemáš právo na túto akciu'}, status=403)
+    _bezpecne_zmaz_subor(fotka.obrazok)
+    fotka.delete()
+    return JsonResponse({'success': True})
 
 def ziskaj_suradnice(mesto_text):
     if not mesto_text or not mesto_text.strip():
         return None, None, None
     try:
-        # Odstránili sme striktný &featuretype=settlement pre lepšie vyhľadávanie bez diakritiky
-        url = (
-            f"https://nominatim.openstreetmap.org/search?"
-            f"format=json&q={requests.utils.quote(mesto_text.strip())}&limit=1&addressdetails=1"
-            f"&accept-language=sk&countrycodes=sk"
-        )
-        response = requests.get(url, headers={'User-Agent': 'NOVU_App_Educational'}, timeout=5)
-        data = response.json()
-        
-        if data and len(data) > 0:
-            lat, lon = float(data[0]['lat']), float(data[0]['lon'])
+        url = f"https://nominatim.openstreetmap.org/search?format=json&q={requests.utils.quote(mesto_text.strip())}&limit=1&addressdetails=1&accept-language=sk&countrycodes=sk"
+        data = requests.get(url, headers={'User-Agent': 'NOVU_App_Educational'}, timeout=5).json()
+        if data:
             addr = data[0].get('address', {})
-            
-            # Nájdeme oficiálny názov mesta/obce
             pekny_nazov = (
-                addr.get('city') or 
-                addr.get('town') or 
-                addr.get('village') or 
-                addr.get('municipality') or 
-                addr.get('hamlet') or 
-                addr.get('county') or
+                addr.get('city') or addr.get('town') or addr.get('village') or 
+                addr.get('municipality') or addr.get('hamlet') or addr.get('county') or 
                 data[0].get('display_name', '').split(',')[0].strip()
             )
-            return lat, lon, pekny_nazov
+            return float(data[0]['lat']), float(data[0]['lon']), pekny_nazov
     except Exception as e:
         print(f"Chyba pri získavaní súradníc pre '{mesto_text}': {e}")
-        
     return None, None, None
 
 def zisti_odhad_lokality(request):
@@ -85,11 +65,61 @@ def zisti_odhad_lokality(request):
         ip = '178.143.32.253'
     try:
         data = requests.get(f'http://ip-api.com/json/{ip}', timeout=2).json()
-        if data.get('status') == 'success':
-            return data.get('city', '') 
-    except: pass
-    return ""
+        return data.get('city', '') if data.get('status') == 'success' else ""
+    except Exception:
+        return ""
 
+def _vyhodnot_ai_kontrolu(form, hlavna_foto, vedlajsie_fotky):
+    nazov = form.cleaned_data.get('nazov', '')
+    popis = form.cleaned_data.get('popis', '')
+    skumany_text = f"Názov: {nazov}\nPopis: {popis if popis else 'Bez popisu'}"
+    
+    fotky_pre_ai = []
+    # Zozbieranie hlavnej aj vedľajších fotiek
+    vsetky_fotky = [hlavna_foto] + (vedlajsie_fotky or [])
+    
+    for f in vsetky_fotky:
+        if f:
+            try:
+                f.seek(0)  # Reset kurzoru súboru, aby ho PIL Image správne prečítal
+                fotky_pre_ai.append(f)
+            except Exception as e:
+                print(f"Chyba pri príprave fotky pre AI: {e}")
+
+    try:
+        vysledok = hlavna_kontrola_obsahu(skumany_text, fotky_pre_ai)
+        return vysledok.get('status', 'Schválený'), vysledok.get('dovod', ''), False
+    except Exception as ai_error:
+        return 'Karanténa', f"AI zlyhalo: {str(ai_error)}", True
+
+def _ulozi_inzerat_s_lokalitou_a_fotkami(inzerat, form, surova_lokalita, hlavna_foto, vedlajsie_fotky, stara_lokalita=None):
+    """Pomocná funkcia na uloženie inzerátu, geolokácie a obrázkov."""
+    inzerat = form.save(commit=False)
+    
+    if surova_lokalita and surova_lokalita.strip() and (surova_lokalita.strip() != stara_lokalita or inzerat.lat is None):
+        lat, lon, pekny_nazov = ziskaj_suradnice(surova_lokalita.strip())
+        if lat and lon and pekny_nazov:
+            inzerat.lat, inzerat.lon, inzerat.lokalita = lat, lon, pekny_nazov
+        else:
+            inzerat.lokalita = surova_lokalita.strip().split(',')[0].strip()
+    else:
+        inzerat.lokalita = surova_lokalita
+
+    if hlavna_foto:
+        inzerat.obrazok = hlavna_foto
+
+    inzerat.save()
+
+    if vedlajsie_fotky:
+        for f in vedlajsie_fotky:
+            try: f.seek(0)
+            except Exception: pass
+            InzeratObrazok.objects.create(inzerat=inzerat, obrazok=f)
+
+    if 'vygeneruj_skryte_tagy' in globals():
+        inzerat.skryte_tagy = vygeneruj_skryte_tagy(inzerat)
+        inzerat.save()
+    return inzerat
 
 # ==========================================================================
 # --- INZERÁTY (Pridanie, Úprava, Mazanie) ---
@@ -98,92 +128,29 @@ def zisti_odhad_lokality(request):
 @login_required
 def pridat_inzerat(request):
     if request.method == 'POST':
-        user_key = f"spam_check_{request.user.id}"
-        if cache.get(user_key):
+        if cache.get(f"spam_check_{request.user.id}"):
             return JsonResponse({'error': 'Prosím, počkajte 30 sekúnd.'}, status=429)
 
-        hlavna_fotka_subor = request.FILES.get('obrazok')
-        list_vedlajsich_fotiek = request.FILES.getlist('fotky')
         form = InzeratForm(request.POST, request.FILES)
-        
         if form.is_valid():
-            # 1. Pripravíme text a surové fotky z pamäte pre AI kontrolu
-            nazov = form.cleaned_data.get('nazov', '')
-            popis = form.cleaned_data.get('popis', '')
-            skumany_text = f"Názov: {nazov}\nPopis: {popis}"
-            
-            pripravene_fotky_pre_ai = []
-            if hlavna_fotka_subor:
-                try: hlavna_fotka_subor.seek(0)
-                except: pass
-                pripravene_fotky_pre_ai.append(hlavna_fotka_subor)
-            
-            if list_vedlajsich_fotiek:
-                for f in list_vedlajsich_fotiek:
-                    try: f.seek(0)
-                    except: pass
-                    pripravene_fotky_pre_ai.append(f)
+            hlavna_foto = request.FILES.get('obrazok')
+            vedlajsie_fotky = request.FILES.getlist('fotky')
 
-            # 2. Spustíme AI analýzu PRED akýmkoľvek uložením na disk
-            try:
-                vysledok_kontroly = hlavna_kontrola_obsahu(skumany_text, pripravene_fotky_pre_ai)
-                status = vysledok_kontroly.get('status', 'Schválený')
-                dovod_zamietnutia = vysledok_kontroly.get('dovod', '')
-                kontrola_zlyhala = False
-            except Exception as ai_error:
-                status = 'Schválený'
-                dovod_zamietnutia = f"AI zlyhalo: {str(ai_error)}"
-                kontrola_zlyhala = True
-
-            # Ak AI inzerát zamietne, hneď končíme. Na disk sa nič neuložilo.
+            status, dovod, kontrola_zlyhala = _vyhodnot_ai_kontrolu(form, hlavna_foto, vedlajsie_fotky)
             if status == "Zamietnutý":
-                return JsonResponse({'error': f"Inzerát bol zamietnutý cenzúrou: {dovod_zamietnutia}"}, status=400)
+                return JsonResponse({'error': f"Inzerát bol zamietnutý cenzúrou: {dovod}"}, status=400)
 
-            # 3. Ak prešiel, bezpečne ho zapíšeme do DB a na disk
             try:
                 with transaction.atomic():
                     inzerat = form.save(commit=False)
                     inzerat.autor = request.user
+                    inzerat.status, inzerat.dovod_zamietnutia, inzerat.kontrola_zlyhala = status, dovod, kontrola_zlyhala
                     
-                    # OPRAVA LOKALITY: Získanie súradníc a oficiálneho názvu s diakritikou
-                    surova_lokalita = request.POST.get('lokalita', '')
-                    if surova_lokalita and surova_lokalita.strip():
-                        lat, lon, pekny_nazov = ziskaj_suradnice(surova_lokalita.strip())
-                        if lat and lon and pekny_nazov:
-                            inzerat.lat = lat
-                            inzerat.lon = lon
-                            inzerat.lokalita = pekny_nazov
-                        else:
-                            inzerat.lokalita = surova_lokalita.strip().split(',')[0].strip()
-                    else:
-                        inzerat.lokalita = surova_lokalita
+                    inzerat = _ulozi_inzerat_s_lokalitou_a_fotkami(
+                        inzerat, form, request.POST.get('lokalita', ''), hlavna_foto, vedlajsie_fotky
+                    )
 
-                    inzerat.status = status
-                    inzerat.dovod_zamietnutia = dovod_zamietnutia
-                    inzerat.kontrola_zlyhala = kontrola_zlyhala
-                    
-                    if hlavna_fotka_subor:
-                        inzerat.obrazok = hlavna_fotka_subor
-
-                    inzerat.save()
-
-                    if list_vedlajsich_fotiek:
-                        for f in list_vedlajsich_fotiek:
-                            try: f.seek(0)
-                            except: pass
-                            InzeratObrazok.objects.create(inzerat=inzerat, obrazok=f)
-
-                    if 'vygeneruj_skryte_tagy' in globals():
-                        inzerat.skryte_tagy = vygeneruj_skryte_tagy(inzerat)
-                    
-                    inzerat.save()
-                        
-                return JsonResponse({
-                    'status': 'success',
-                    'success': True,
-                    'redirect_url': reverse('detail_inzeratu', kwargs={'pk': inzerat.id})
-                }, status=200)
-
+                return JsonResponse({'status': 'success', 'success': True, 'redirect_url': reverse('detail_inzeratu', kwargs={'pk': inzerat.id})})
             except Exception as celkova_chyba:
                 return JsonResponse({'error': f'Systémová chyba pri ukladaní: {str(celkova_chyba)}'}, status=500)
                 
@@ -199,105 +166,40 @@ def upravit_inzerat(request, pk):
         return JsonResponse({'error': 'Nemáte oprávnenie na úpravu tohto inzerátu.'}, status=403)
     
     if request.method == 'POST':
-        stara_lokalita = inzerat.lokalita
-        hlavna_fotka_subor = request.FILES.get('obrazok')
-        list_vedlajsich_fotiek = request.FILES.getlist('fotky')
-        stara_hlavna_fotka = inzerat.obrazok
-
+        stara_lokalita, stara_hlavna_fotka = inzerat.lokalita, inzerat.obrazok
+        hlavna_foto = request.FILES.get('obrazok')
+        vedlajsie_fotky = request.FILES.getlist('fotky')
         form = InzeratForm(request.POST, request.FILES, instance=inzerat)
         
         if form.is_valid():
-            # 1. Zistíme, či úprava vyžaduje opätovnú AI kontrolu
-            vyzaduje_ai_kontrolu = bool(hlavna_fotka_subor or list_vedlajsich_fotiek or form.has_changed())
-            
-            status = inzerat.status
-            dovod_zamietnutia = inzerat.dovod_zamietnutia
-            kontrola_zlyhala = inzerat.kontrola_zlyhala
+            vyzaduje_ai = bool(hlavna_foto or vedlajsie_fotky or form.has_changed())
+            status, dovod, kontrola_zlyhala = inzerat.status, inzerat.dovod_zamietnutia, inzerat.kontrola_zlyhala
 
-            if vyzaduje_ai_kontrolu:
-                nazov = form.cleaned_data.get('nazov', '')
-                popis = form.cleaned_data.get('popis', '')
-                skumany_text = f"Názov: {nazov}\nPopis: {popis}"
-                
-                ai_list_fotiek = []
-                
-                if hlavna_fotka_subor:
-                    try: hlavna_fotka_subor.seek(0)
-                    except: pass
-                    ai_list_fotiek.append(hlavna_fotka_subor)
-                    
-                if list_vedlajsich_fotiek:
-                    for f in list_vedlajsich_fotiek:
-                        try: f.seek(0)
-                        except: pass
-                        ai_list_fotiek.append(f)
-
-                try:
-                    vysledok_kontroly = hlavna_kontrola_obsahu(skumany_text, ai_list_fotiek)
-                    status = vysledok_kontroly.get('status', 'Schválený')
-                    dovod_zamietnutia = vysledok_kontroly.get('dovod', '')
-                    kontrola_zlyhala = False
-                except Exception as e:
-                    status = 'Schválený'
-                    dovod_zamietnutia = "AI nedostupné počas úpravy"
-                    kontrola_zlyhala = True
+            if vyzaduje_ai:
+                status, dovod, kontrola_zlyhala = _vyhodnot_ai_kontrolu(form, hlavna_foto, vedlajsie_fotky)
 
             if status == "Zamietnutý":
-                return JsonResponse({'error': f"Inzerát bol po úprave zamietnutý cenzúrou: {dovod_zamietnutia}"}, status=400)
+                return JsonResponse({'error': f"Inzerát bol po úprave zamietnutý cenzúrou: {dovod}"}, status=400)
 
-            # 2. Ak úprava prešla, zapíšeme dáta v DB
-            stare_fotky_na_zmazanie_po_commite = []
+            stare_fotky_na_zmazanie = []
             try:
                 with transaction.atomic():
-                    inzerat = form.save(commit=False)
-                    surova_lokalita = request.POST.get('lokalita', '')
-                    inzerat.status = status
-                    inzerat.dovod_zamietnutia = dovod_zamietnutia
-                    inzerat.kontrola_zlyhala = kontrola_zlyhala
-                    
-                    if hlavna_fotka_subor:
-                        if stara_hlavna_fotka:
-                            stare_fotky_na_zmazanie_po_commite.append(stara_hlavna_fotka)
-                        inzerat.obrazok = hlavna_fotka_subor
+                    inzerat.status, inzerat.dovod_zamietnutia, inzerat.kontrola_zlyhala = status, dovod, kontrola_zlyhala
+                    if hlavna_foto and stara_hlavna_fotka:
+                        stare_fotky_na_zmazanie.append(stara_hlavna_fotka)
 
-                    # OPRAVA LOKALITY: Aktualizácia súradníc a oficiálneho názvu s diakritikou
-                    if surova_lokalita and surova_lokalita.strip() and (surova_lokalita.strip() != stara_lokalita or inzerat.lat is None):
-                        lat, lon, pekny_nazov = ziskaj_suradnice(surova_lokalita.strip())
-                        if lat and lon and pekny_nazov:
-                            inzerat.lat = lat
-                            inzerat.lon = lon
-                            inzerat.lokalita = pekny_nazov
-                        else:
-                            inzerat.lokalita = surova_lokalita.strip().split(',')[0].strip()
-                    
-                    inzerat.save()
-
-                    if list_vedlajsich_fotiek:
-                        for stara_foto in inzerat.dodatocne_obrazky.all():
-                            if stara_foto.obrazok:
-                                stare_fotky_na_zmazanie_po_commite.append(stara_foto.obrazok)
+                    if vedlajsie_fotky:
+                        stare_fotky_na_zmazanie.extend([f.obrazok for f in inzerat.dodatocne_obrazky.all() if f.obrazok])
                         inzerat.dodatocne_obrazky.all().delete()
 
-                        for f in list_vedlajsich_fotiek:
-                            try: f.seek(0)
-                            except: pass
-                            InzeratObrazok.objects.create(inzerat=inzerat, obrazok=f)
+                    inzerat = _ulozi_inzerat_s_lokalitou_a_fotkami(
+                        inzerat, form, request.POST.get('lokalita', ''), hlavna_foto, vedlajsie_fotky, stara_lokalita
+                    )
 
-                    if 'vygeneruj_skryte_tagy' in globals():
-                        inzerat.skryte_tagy = vygeneruj_skryte_tagy(inzerat)
-                    
-                    inzerat.save()
+                for f in stare_fotky_na_zmazanie:
+                    _bezpecne_zmaz_subor(f)
 
-                gc.collect()
-                for stara_f in stare_fotky_na_zmazanie_po_commite:
-                    _bezpecne_zmaz_subor(stara_f)
-
-                return JsonResponse({
-                    'status': 'success',
-                    'success': True,
-                    'redirect_url': reverse('detail_inzeratu', kwargs={'pk': inzerat.id})
-                }, status=200)
-
+                return JsonResponse({'status': 'success', 'success': True, 'redirect_url': reverse('detail_inzeratu', kwargs={'pk': inzerat.id})})
             except Exception as celkova_chyba:
                 traceback.print_exc()
                 return JsonResponse({'error': f'Systémová chyba pri úprave: {str(celkova_chyba)}'}, status=500)
@@ -309,23 +211,13 @@ def upravit_inzerat(request, pk):
 
 def odstranit_inzerat(request, pk):
     inzerat = get_object_or_404(Inzerat, pk=pk)
-    
     if request.method == 'POST':
         try:
-            gc.collect()  
-            if inzerat.obrazok:
-                inzerat.obrazok.delete(save=False)
-            
-            if hasattr(inzerat, 'dodatocne_obrazky'):
-                for foto in inzerat.dodatocne_obrazky.all(): 
-                    if foto.obrazok:
-                        foto.obrazok.delete(save=False)
-            elif hasattr(inzerat, 'inzeratobrazok_set'):
-                for foto in inzerat.inzeratobrazok_set.all():
-                    if foto.obrazok:
-                        foto.obrazok.delete(save=False)
+            _bezpecne_zmaz_subor(inzerat.obrazok)
+            for foto in getattr(inzerat, 'dodatocne_obrazky', inzerat.inzeratobrazok_set).all():
+                _bezpecne_zmaz_subor(foto.obrazok)
         except Exception as e:
-            print(f"Upozornenie pri mazaní súboru z disku: {e}")
+            print(f"Upozornenie pri mazaní súboru: {e}")
 
         inzerat.delete() 
         return redirect('/')  
@@ -334,16 +226,16 @@ def odstranit_inzerat(request, pk):
 
 
 def detail_inzeratu(request, pk):
-    hranica_expiracie = timezone.now() - timedelta(days=30)
-    inzerat = get_object_or_404(Inzerat, pk=pk, je_aktivny=True, vytvorene__gte=hranica_expiracie)
-    return render(request, 'inzeraty/detail.html', {'inzerat': inzerat})
+    hranica = timezone.now() - timedelta(days=30)
+    return render(request, 'inzeraty/detail.html', {
+        'inzerat': get_object_or_404(Inzerat, pk=pk, je_aktivny=True, vytvorene__gte=hranica)
+    })
 
 @login_required
 def predlzit_inzerat(request, pk):
     if request.method == 'POST':
         inzerat = get_object_or_404(Inzerat, pk=pk, autor=request.user)
-        inzerat.vytvorene = timezone.now()
-        inzerat.je_aktivny = True
+        inzerat.vytvorene, inzerat.je_aktivny = timezone.now(), True
         inzerat.save(update_fields=['vytvorene', 'je_aktivny'])
         return redirect('profil')
     return HttpResponse(status=400)
@@ -359,47 +251,29 @@ def ai_analyza_ajax(request, pk):
 @login_required
 def zacat_chat(request, inzerat_id):
     inzerat = get_object_or_404(Inzerat, id=inzerat_id)
-    if inzerat.autor == request.user:
-        return redirect('detail_inzeratu', pk=inzerat.id) 
-    return redirect('chat_detail', inzerat_id=inzerat.id)
+    return redirect('detail_inzeratu' if inzerat.autor == request.user else 'chat_detail', pk=inzerat.id if inzerat.autor == request.user else inzerat.id)
 
 @login_required
 def chat_detail(request, inzerat_id):
     inzerat = get_object_or_404(Inzerat, id=inzerat_id) 
     kupujuci_id = request.GET.get('kupujuci_id')
     
-    # 1. Nájdenie správnej konverzácie
-    if kupujuci_id:
-        konverzacia = Konverzacia.objects.filter(
-            inzerat=inzerat, 
-            kupujuci_id=kupujuci_id
-        ).first()
-    else:
-        konverzacia = Konverzacia.objects.filter(
-            inzerat=inzerat
-        ).filter(
-            Q(kupujuci=request.user) | Q(predajca=request.user)
-        ).first()
+    konverzacia_qs = Konverzacia.objects.filter(inzerat=inzerat)
+    konverzacia = konverzacia_qs.filter(kupujuci_id=kupujuci_id).first() if kupujuci_id else konverzacia_qs.filter(Q(kupujuci=request.user) | Q(predajca=request.user)).first()
         
     spravy = []
     if konverzacia:
         if not request.user.is_staff:
-            # Označíme neprečítané správy pre daného používateľa ako prečítané
             konverzacia.spravy.filter(precitane=False).exclude(odosielatel=request.user).update(precitane=True)
-            
         spravy = konverzacia.spravy.all().order_by('poslane')
     
-    # Prepočítanie neprečítaných správ pre aktuálneho používateľa
     unread_count = Sprava.objects.filter(
         Q(konverzacia__kupujuci=request.user) | Q(konverzacia__predajca=request.user),
         precitane=False
     ).exclude(odosielatel=request.user).distinct().count()
 
     return render(request, 'inzeraty/chat_detail.html', {
-        'inzerat': inzerat, 
-        'konverzacia': konverzacia, 
-        'spravy': spravy,
-        'unread_count': unread_count
+        'inzerat': inzerat, 'konverzacia': konverzacia, 'spravy': spravy, 'unread_count': unread_count
     })
 
 @login_required
@@ -409,142 +283,96 @@ def moje_chaty(request):
 
 @login_required
 def poslat_spravu(request, inzerat_id):
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error'}, status=400)
+
     inzerat = get_object_or_404(Inzerat, id=inzerat_id)
-    if request.method == 'POST':
-        konverzacia_id = request.POST.get('konverzacia_id')
-        
-        # 1. Ak máme ID konverzácie, načítame presne tú
-        if konverzacia_id:
-            konverzacia = Konverzacia.objects.filter(
-                id=konverzacia_id, 
-                inzerat=inzerat
-            ).filter(Q(kupujuci=request.user) | Q(predajca=request.user)).first()
-        else:
-            # 2. Ak ID nemáme (nový chat z pohľadu kupujúceho), hľadáme konverzáciu kupujúceho
-            konverzacia = Konverzacia.objects.filter(
-                inzerat=inzerat, 
-                kupujuci=request.user
-            ).first()
+    konverzacia_id = request.POST.get('konverzacia_id')
+    
+    konverzacia = Konverzacia.objects.filter(id=konverzacia_id, inzerat=inzerat).filter(Q(kupujuci=request.user) | Q(predajca=request.user)).first() if konverzacia_id else Konverzacia.objects.filter(inzerat=inzerat, kupujuci=request.user).first()
 
-        text = request.POST.get('text', '').strip()
-        obrazok = request.FILES.get('obrazok')
-        video = request.FILES.get('video')
+    text, obrazok, video = request.POST.get('text', '').strip(), request.FILES.get('obrazok'), request.FILES.get('video')
+    if not any([text, obrazok, video]):
+        return JsonResponse({'status': 'empty'}, status=400)
 
-        if not text and not obrazok and not video:
-            return JsonResponse({'status': 'empty'}, status=400)
+    if obrazok or video:
+        cache_key = f"attachment_limit_{request.user.id}"
+        if cache.get(cache_key, 0) >= 5:
+            return JsonResponse({'error': 'Poslali ste príliš veľa príloh. Počkajte minútu.'}, status=429)
+        cache.set(cache_key, cache.get(cache_key, 0) + 1, timeout=60)
 
-        # --- LIMIT PRÍLOH (RATE LIMITING) ---
-        if obrazok or video:
-            cache_key = f"attachment_limit_{request.user.id}"
-            pocet_priloh = cache.get(cache_key, 0)
+    if not konverzacia:
+        if request.user == inzerat.autor:
+            return JsonResponse({'error': 'Predajca nemôže začať konverzáciu sám so sebou.'}, status=400)
+        konverzacia = Konverzacia.objects.create(inzerat=inzerat, predajca=inzerat.autor, kupujuci=request.user)
 
-            if pocet_priloh >= 5:
-                return JsonResponse({'error': 'Poslali ste príliš veľa príloh. Počkajte minútu.'}, status=429)
-
-            cache.set(cache_key, pocet_priloh + 1, timeout=60)
-
-        # Ak konverzácia neexistuje a píše kupujúci, vytvoríme ju
-        if not konverzacia:
-            if request.user == inzerat.autor:
-                return JsonResponse({'error': 'Predajca nemôže začať konverzáciu sám so sebou.'}, status=400)
-            konverzacia = Konverzacia.objects.create(inzerat=inzerat, predajca=inzerat.autor, kupujuci=request.user)
-
-        sprava = Sprava.objects.create(
-            konverzacia=konverzacia, odosielatel=request.user, text=text,
-            obrazok=obrazok, video=video
-        )
-        return JsonResponse({
-            'status': 'success', 
-            'cas': sprava.poslane.strftime("%H:%M"),
-            'konverzacia_id': konverzacia.id
-        })
-    return JsonResponse({'status': 'error'}, status=400)
+    sprava = Sprava.objects.create(konverzacia=konverzacia, odosielatel=request.user, text=text, obrazok=obrazok, video=video)
+    return JsonResponse({'status': 'success', 'cas': sprava.poslane.strftime("%H:%M"), 'konverzacia_id': konverzacia.id})
 
 
 @login_required
 def nacitat_spravy(request, konverzacia_id):
     konverzacia = get_object_or_404(Konverzacia, id=konverzacia_id)
-    
-    # Označíme správy ako prečítané
-    if not request.user.is_staff and (konverzacia.kupujuci == request.user or konverzacia.predajca == request.user):
+    if not request.user.is_staff and request.user in [konverzacia.kupujuci, konverzacia.predajca]:
         konverzacia.spravy.filter(precitane=False).exclude(odosielatel=request.user).update(precitane=True)
 
-    spravy = konverzacia.spravy.all().order_by('poslane')
-    
-    # Zistíme aktuálny celkový počet neprečítaných správ pre používateľa v celom systéme
     unread_count = Sprava.objects.filter(
         Q(konverzacia__kupujuci=request.user) | Q(konverzacia__predajca=request.user),
         precitane=False
     ).exclude(odosielatel=request.user).distinct().count()
 
-    response = render(request, 'inzeraty/chat_messages_partial.html', {'spravy': spravy, 'user': request.user})
-    # Pošleme aktuálny počet neprečítaných správ v HTTP hlavičke
+    response = render(request, 'inzeraty/chat_messages_partial.html', {'spravy': konverzacia.spravy.all().order_by('poslane'), 'user': request.user})
     response['X-Unread-Count'] = str(unread_count)
     return response
 
 @login_required
 def zmazat_spravu(request, sprava_id):
+    if request.method != 'POST':
+        return HttpResponse(status=400)
+    
     sprava = get_object_or_404(Sprava, id=sprava_id, odosielatel=request.user)
-    if request.method == 'POST':
-        konverzacia = sprava.konverzacia
-        sprava.delete()
+    konverzacia = sprava.konverzacia
+    sprava.delete()
+    
+    if not konverzacia.spravy.exists():
+        konverzacia.delete()
+        return JsonResponse({'status': 'conversation_deleted'}, status=200)
         
-        if not konverzacia.spravy.exists():
-            konverzacia.delete()
-            return JsonResponse({'status': 'conversation_deleted'}, status=200)
-            
-        # Po zmazaní vlastnej správy označíme prípadné doručené správy ako prečítané
-        if not request.user.is_staff:
-            konverzacia.spravy.filter(precitane=False).exclude(odosielatel=request.user).update(precitane=True)
-            
-        return HttpResponse(status=200)
-    return HttpResponse(status=400)
+    if not request.user.is_staff:
+        konverzacia.spravy.filter(precitane=False).exclude(odosielatel=request.user).update(precitane=True)
+        
+    return HttpResponse(status=200)
 
 @login_required
 def upravit_spravu(request, sprava_id):
+    if request.method != 'POST':
+        return HttpResponse(status=400)
     sprava = get_object_or_404(Sprava, id=sprava_id, odosielatel=request.user)
-    if request.method == 'POST':
-        novy_text = request.POST.get('text', '').strip()
-        if not novy_text and not sprava.obrazok:
-            return HttpResponse("Chyba", status=400)
-        sprava.text = novy_text
-        sprava.save(update_fields=['text'])
-        return HttpResponse(status=200)
-    return HttpResponse(status=400)
+    novy_text = request.POST.get('text', '').strip()
+    if not novy_text and not sprava.obrazok:
+        return HttpResponse("Chyba", status=400)
+    sprava.text = novy_text
+    sprava.save(update_fields=['text'])
+    return HttpResponse(status=200)
 
 @login_required
 @require_POST
 def nahlasit_spravu(request, sprava_id):
     sprava = get_object_or_404(Sprava, id=sprava_id)
-    
-    # Používateľ nemôže nahlásiť svoju vlastnú správu
     if sprava.odosielatel == request.user:
         return JsonResponse({'error': 'Nemôžete nahlásiť vlastnú správu.'}, status=400)
         
-    dovod = request.POST.get('dovod')
-    popis = request.POST.get('popis', '')
-    
+    dovod, popis = request.POST.get('dovod'), request.POST.get('popis', '').strip()
     if not dovod:
         return JsonResponse({'error': 'Musíte vybrať dôvod nahlásenia.'}, status=400)
-        
-    # Kontrola, či už tento používateľ danú správu nenahlásil
     if Report.objects.filter(zalobca=request.user, sprava=sprava).exists():
         return JsonResponse({'error': 'Túto správu ste už nahlásili.'}, status=400)
-        
-    # OPRAVENÉ: Ak adminovi chýba textový popis, predvyplníme ho samotným textom správy
-    if not popis.strip():
-        popis = f"Nahlásený text správy: {sprava.text if sprava.text else '[Súbor/Príloha]'}"
 
-    # Vytvorenie reportu v databáze (PRIDANÝ obvineny A inzerat)
     Report.objects.create(
-        zalobca=request.user, 
-        obvineny=sprava.odosielatel,
-        inzerat=sprava.konverzacia.inzerat,
-        sprava=sprava, 
-        dovod=dovod, 
-        popis=popis
+        zalobca=request.user, obvineny=sprava.odosielatel,
+        inzerat=sprava.konverzacia.inzerat, sprava=sprava, 
+        dovod=dovod, popis=popis or f"Nahlásený text správy: {sprava.text or '[Súbor/Príloha]'}"
     )
-    
     return JsonResponse({'success': 'Správa bola úspešne nahlásená. Admini situáciu preveria.'})
 
 @login_required
@@ -553,11 +381,12 @@ def nahlasit_inzerat(request, pk):
     inzerat = get_object_or_404(Inzerat, pk=pk)
     if inzerat.autor == request.user:
         return JsonResponse({'error': 'Nemôžete nahlásiť vlastný inzerát.'}, status=400)
-    dovod = request.POST.get('dovod')
-    popis = request.POST.get('popis', '')
+    
+    dovod, popis = request.POST.get('dovod'), request.POST.get('popis', '')
     if not dovod:
         return JsonResponse({'error': 'Musíte vybrať dôvod nahlásenia.'}, status=400)
     if Report.objects.filter(zalobca=request.user, inzerat=inzerat).exists():
         return JsonResponse({'error': 'Tento inzerát ste už nahlásili.'}, status=400)
+        
     Report.objects.create(zalobca=request.user, inzerat=inzerat, dovod=dovod, popis=popis)
     return JsonResponse({'success': 'Inzerát bol úspešne nahlásený. Admini situáciu preveria.'})

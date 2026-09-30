@@ -54,6 +54,8 @@ def ziskaj_ai_analyzu(inzerat):
         print(f"DEBUG: Chyba/Timeout DuckDuckGo: {e}")
         web_context = "Nepodarilo sa získať aktuálne slovenské dáta z webu."
 
+    popis_inzeratu = inzerat.popis if inzerat.popis else "Bez popisu"
+
     prompt = f"""
     Si prísny analytik pre slovenský bazárový trh so špecializáciou na zberateľské predmety a nedostatkový tovar.
     Tvojou úlohou je chrániť kupujúceho, ale zároveň objektívne rozpoznať hodnotu vzácnych kúskov.
@@ -62,7 +64,7 @@ def ziskaj_ai_analyzu(inzerat):
     - Názov: "{inzerat.nazov}"
     - Cena v inzeráte: {inzerat.cena} EUR
     - Kategória: {inzerat.kategoria.nazov if inzerat.kategoria else 'Neznáma'}
-    - Popis (dôležitý pre stav): {inzerat.popis[:600]}
+    - Popis (dôležitý pre stav): {popis_inzeratu[:600]}
 
     DÁTA Z WEBU (Aktuálny trh v SR/EÚ):
     {web_context}
@@ -117,10 +119,8 @@ def ziskaj_ai_analyzu(inzerat):
     return "AI analýza momentálne nie je k dispozícii kvôli chybe na strane modelu."
 
 def vygeneruj_skryte_tagy(inzerat):
-    if not inzerat.popis or len(inzerat.popis) < 150:
-        print(f"DEBUG: Popis je krátky ({len(inzerat.popis if inzerat.popis else '')} zn.), preskakujem AI tagy.")
-        return ""
-
+    popis_text = inzerat.popis if inzerat.popis else ""
+    
     prompt = f"""
     Si pomocník pre slovenský bazár. Na základe názvu "{inzerat.nazov}" a popisu vygeneruj 
     zoznam slovenských synoným a súvisiacich výrazov, ktoré by ľudia mohli hľadať.
@@ -128,7 +128,7 @@ def vygeneruj_skryte_tagy(inzerat):
     Príklad: Pre "Nike Phantom" pridaj "kopačky, futbalová obuv, lisovky, šport".
     Príklad: Pre "iPhone" pridaj "mobil, telefón, smartphone, apple".
 
-    Popis: {inzerat.popis[:300]}
+    Popis: {popis_text[:300]}
     
     Vráť IBA kľúčové slová oddelené čiarkou, nič iné.
     """
@@ -163,27 +163,34 @@ def obsahuje_zakazane_slova(text: str) -> bool:
 
 # BACKEND MODERÁCIA
 SYSTEM_PROMPT = """
-Si nekompromisný automatický moderator slovenského online bazáru a chatovacieho systému "Novu". 
-Tvojou úlohou je analyzovať text a priložené obrázky.
+Si nekompromisný automatický moderátor slovenského online bazáru "Novu".
+Tvojou úlohou je analyzovať text aj priložené obrázky.
 
-Hľadáš nasledujúci zakázaný obsah:
-1. Drogy a omamné látky.
-2. Zbrane, strelivo, výbušniny.
-3. Podvody (Scam), phishing.
-4. Vulgarizmy, urážky.
+PRÍSNE KONTROLUJ OBRÁZKY (OCR DETEKCIA):
+- Skontroluj VŠETOK text zobrazený na obrázkoch (oblečenie, tričká, plachty, papiere).
+- Ak sa na fotke nachádza akýkoľvek vulgarizmus, nadávka alebo nenávistný prejav (napr. "kokot", "píča", "jebať" a pod.), inzerát MUSÍŠ ZAMIETNUŤ!
+
+PRÍSNE KONTROLUJ TEXT:
+- Deteguj aj zamaskované vulgarizmy, skratky alebo nedokončené slová (napr. "kok", "kkt", "pč" a pod.), ak z kontextu jednoznačne vyplýva ich vulgárny význam.
+
+Zakázaný obsah:
+1. Vulgarizmy, urážky, skryté/zamaskované nadávky a vulgárny text na fotkách.
+2. Drogy a omamné látky.
+3. Zbrane, strelivo, výbušniny.
+4. Podvody (Scam), phishing.
 5. Iná nelegálna činnosť.
 
 Odpovedaj STRIKTNE vo formáte JSON:
-{{
-  "schvalene": true/false,
-  "status": "Schválený" / "Zamietnutý" / "Karanténa",
-  "dovod": "Stručné zdôvodnenie v slovenčine",
-  "kategoria_problemu": "drogy" / "zbrane" / "scam" / "vulgarizmy" / "ine" / "ziadna"
-}}
+{
+  "schvalene": false,
+  "status": "Zamietnutý",
+  "dovod": "Inzerát obsahuje vulgarizmy v texte alebo priamo na obrázku.",
+  "kategoria_problemu": "vulgarizmy"
+}
 """
 
 def skontroluj_obsah_cez_gemini(text: str, obrazky_list: list = None) -> dict:
-    obsah_pre_gemini = [f"Text na analýzu:\n{text}"]
+    obsah_pre_gemini = [f"Text na analýzu:\n{text if text else 'Bez textu'}"]
     
     if obrazky_list:
         for img_file in obrazky_list:
