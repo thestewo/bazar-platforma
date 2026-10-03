@@ -5,24 +5,52 @@ from PIL import Image
 from duckduckgo_search import DDGS
 from google import genai
 from google.genai import types
+from google.genai.types import HarmCategory, HarmBlockThreshold
 
-# Globálna inicializácia nového klienta (automaticky si vezme GEMINI_API_KEY z prostredia)
+# Globálna inicializácia klienta
 client = genai.Client()
+
+# Nastavenie bezpečnostných filtrov, aby AI neodmietala spracovať fotky/text
+SAFETY_SETTINGS = [
+    types.SafetySetting(
+        category=HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+        threshold=HarmBlockThreshold.BLOCK_NONE,
+    ),
+    types.SafetySetting(
+        category=HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+        threshold=HarmBlockThreshold.BLOCK_NONE,
+    ),
+    types.SafetySetting(
+        category=HarmCategory.HARM_CATEGORY_HARASSMENT,
+        threshold=HarmBlockThreshold.BLOCK_NONE,
+    ),
+    types.SafetySetting(
+        category=HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+        threshold=HarmBlockThreshold.BLOCK_NONE,
+    ),
+]
 
 def zavolaj_gemini_s_fallbackom(contents, config=None):
     """
     Bezpečne zavolá primárny alebo záložný model.
-    Vráti priamo text odpovede (str), alebo None ak oba pokusy zlyhajú.
     """
-    primarny_model = 'gemini-2.5-flash'
-    zalozny_model = 'gemini-2.5-flash-lite'
+    # Použijeme overené stabilné názvy modelov
+    primarny_model = 'gemini-3.5-flash-lite'
+    zalozny_model = 'gemini-3.1-flash-lite'
+
+    if config is None:
+        config = types.GenerateContentConfig(
+            temperature=0.2,
+            safety_settings=SAFETY_SETTINGS
+        )
+    else:
+        # Pridáme safety_settings do existujúcej konfigurácie, ak tam chýbajú
+        if not getattr(config, 'safety_settings', None):
+            config.safety_settings = SAFETY_SETTINGS
 
     # 1. Pokus: Primárny model
     try:
-        if config:
-            res = client.models.generate_content(model=primarny_model, contents=contents, config=config)
-        else:
-            res = client.models.generate_content(model=primarny_model, contents=contents)
+        res = client.models.generate_content(model=primarny_model, contents=contents, config=config)
         if res and hasattr(res, 'text') and res.text:
             return res.text
     except Exception as e:
@@ -30,10 +58,7 @@ def zavolaj_gemini_s_fallbackom(contents, config=None):
 
     # 2. Pokus: Záložný model
     try:
-        if config:
-            res = client.models.generate_content(model=zalozny_model, contents=contents, config=config)
-        else:
-            res = client.models.generate_content(model=zalozny_model, contents=contents)
+        res = client.models.generate_content(model=zalozny_model, contents=contents, config=config)
         if res and hasattr(res, 'text') and res.text:
             return res.text
     except Exception as e2:
@@ -45,11 +70,15 @@ def ziskaj_ai_analyzu(inzerat):
     search_query = f"{inzerat.nazov} cena v eurach slovensko"
     web_context = ""
     
+    # Bezpečné získanie dát z DuckDuckGo
     try:
         with DDGS(timeout=5) as ddgs:
             results = list(ddgs.text(search_query, region='sk-sk', max_results=2))
-            for r in results:
-                web_context += f"\nZdroj: {r.get('title', '')} - {r.get('body', '')}"
+            if results:
+                for r in results:
+                    web_context += f"\nZdroj: {r.get('title', '')} - {r.get('body', '')}"
+            else:
+                web_context = "Žiadne výsledky z vyhľadávania."
     except Exception as e:
         print(f"DEBUG: Chyba/Timeout DuckDuckGo: {e}")
         web_context = "Nepodarilo sa získať aktuálne slovenské dáta z webu."
@@ -89,7 +118,6 @@ def ziskaj_ai_analyzu(inzerat):
 
     PRAVIDLÁ:
     - Odpovedaj v slovenčine, buď profesionálny a vecný.
-    - Ak v popise vidíš kľúčové slová ako "vypredané", "raritné", "zberateľské", over si toto tvrdenie v dátach z webu.
     """
 
     content = [prompt]
@@ -110,7 +138,10 @@ def ziskaj_ai_analyzu(inzerat):
 
     text_odpoved = zavolaj_gemini_s_fallbackom(
         contents=content,
-        config=types.GenerateContentConfig(temperature=0.2)
+        config=types.GenerateContentConfig(
+            temperature=0.2,
+            safety_settings=SAFETY_SETTINGS
+        )
     )
 
     if text_odpoved:
@@ -179,6 +210,8 @@ Zakázaný obsah:
 3. Zbrane, strelivo, výbušniny.
 4. Podvody (Scam), phishing.
 5. Iná nelegálna činnosť.
+6. Pornografia a náznaky pornografie(všetky inzeráty čo nejako môžu naznačovat sexuálne aktivity, hračky a tak)
+7. Nereálne/ilogické inzeráty(nedávajú zmysel, napríklad inzerát s názvom lopta má fotku mesiaca alebo názov nesedí s popiskom a tak)
 
 Odpovedaj STRIKTNE vo formáte JSON:
 {

@@ -251,7 +251,9 @@ def ai_analyza_ajax(request, pk):
 @login_required
 def zacat_chat(request, inzerat_id):
     inzerat = get_object_or_404(Inzerat, id=inzerat_id)
-    return redirect('detail_inzeratu' if inzerat.autor == request.user else 'chat_detail', pk=inzerat.id if inzerat.autor == request.user else inzerat.id)
+    if inzerat.autor == request.user:
+        return redirect('detail_inzeratu', pk=inzerat.id)
+    return redirect('chat_detail', inzerat_id=inzerat.id)
 
 @login_required
 def chat_detail(request, inzerat_id):
