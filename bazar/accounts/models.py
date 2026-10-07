@@ -59,7 +59,6 @@ class Report(models.Model):
     zalobca = models.ForeignKey(User, on_delete=models.CASCADE, related_name='podane_hlasenia')
     obvineny = models.ForeignKey(User, on_delete=models.CASCADE, related_name='nahlasenia', null=True, blank=True)
     inzerat = models.ForeignKey(Inzerat, on_delete=models.CASCADE, related_name='nahlasenia', null=True, blank=True)
-    
     dovod = models.CharField(max_length=20, choices=DOVOD_CHOICES)
     popis = models.TextField(blank=True)
     vytvorene = models.DateTimeField(auto_now_add=True)
@@ -67,7 +66,6 @@ class Report(models.Model):
     sprava = models.ForeignKey('inzeraty.Sprava', on_delete=models.SET_NULL, null=True, blank=True)
 
     def __str__(self):
-        # OPRAVENÉ: Ak existuje nahlásená správa, vypíše korektný nadpis incidentu
         if self.sprava:
             return f"{self.zalobca} nahlásil správu od {self.sprava.odosielatel} - {self.get_dovod_display()}"
         if self.inzerat:
@@ -79,3 +77,29 @@ class Report(models.Model):
         verbose_name_plural = "Nahlásenia"
         # UPRAVENÉ: Pridaná unikátnosť aj pre kombináciu žalobcu a konkrétnej správy
         unique_together = [('zalobca', 'obvineny'), ('zalobca', 'inzerat'), ('zalobca', 'sprava')]
+
+
+@receiver(post_save, sender=User)
+def spravuj_inzeraty_pri_zmene_banu(sender, instance, created, **kwargs):
+    # Ignorujeme práve vytvoreného používateľa
+    if created:
+        return
+
+    # Ak je používateľ zablokovaný (is_active == False), deaktivujeme jeho inzeráty
+    if not instance.is_active:
+        Inzerat.objects.filter(autor=instance, je_aktivny=True).update(
+            je_aktivny=False,
+            status='Zamietnutý',
+            dovod_zamietnutia='Zablokovaný používateľský účet.'
+        )
+    # Ak bol používateľ odblokovaný (is_active == True), opäť aktivujeme jeho inzeráty
+    else:
+        Inzerat.objects.filter(
+            autor=instance, 
+            je_aktivny=False, 
+            dovod_zamietnutia='Zablokovaný používateľský účet.'
+        ).update(
+            je_aktivny=True,
+            status='Schválený',
+            dovod_zamietnutia=''
+        )

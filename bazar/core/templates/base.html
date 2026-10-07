@@ -60,33 +60,35 @@
               </ul>
             </li>
 
-            {% if user.is_authenticated %}
-              <li class="nav-item">
-                <a class="nav-link mx-2" href="{% url 'pridat_inzerat' %}">Pridať inzerát</a>
-              </li>
-              <li class="nav-item">
-                <a class="nav-link fw-bold" href="{% url 'profil' %}">Profil ({{ user.username }})</a>
-              </li>
-              <li class="nav-item">
-               <a href="{% url 'moje_chaty' %}" class="nav-link position-relative">
-                      Správy
-              {% if unread_count > 0 %}
-              <span id="unread-badge" class="position-absolute start-100 translate-middle badge rounded-pill bg-primary d-inline-flex align-items-center justify-content-center" 
-              style="width: 18px; height: 18px; font-size: 0.65rem; margin-top: 1px; margin-left: -3px;">
-              {{ unread_count }}
-              </span>
-              {% endif %}
-              </a>
-              </li>
-              <li class="nav-item">
-                <form action="{% url 'logout' %}" method="post" style="display: inline;">
-                  {% csrf_token %}
-                  <button type="submit" class="nav-link btn-logout">
-                    Odhlásiť sa ({{ user.username }})
-                  </button>
-                </form>
-              </li>
-            {% else %}
+                {% if user.is_authenticated %}
+                <li class="nav-item">
+                    <a class="nav-link mx-2" href="{% url 'pridat_inzerat' %}">Pridať inzerát</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link nav-link-profile fw-bold" href="{% url 'profil' %}">
+                    <i class="bi bi-person-circle me-1"></i>Profil ({{ user.username }})
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="{% url 'moje_chaty' %}" class="nav-link position-relative">
+                    Správy
+                    {% if unread_count > 0 %}
+                        <span id="unread-badge" class="position-absolute start-100 translate-middle badge rounded-pill bg-primary d-inline-flex align-items-center justify-content-center" 
+                            style="width: 18px; height: 18px; font-size: 0.65rem; margin-top: 1px; margin-left: -3px;">
+                        {{ unread_count }}
+                        </span>
+                    {% endif %}
+                    </a>
+                </li>
+                <li class="nav-item ms-lg-2">
+                    <form action="{% url 'logout' %}" method="post" class="d-inline">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-logout-danger btn-sm">
+                        <i class="bi bi-box-arrow-right me-1"></i>Odhlásiť sa
+                    </button>
+                    </form>
+                </li>
+                {% else %}
               <li class="nav-item">
                 <a class="nav-link" href="{% url 'login' %}">Prihlásiť sa</a>
               </li>

@@ -87,11 +87,20 @@ class CustomLoginForm(AuthenticationForm):
                 if user_exists:
                     user = User.objects.get(username=username)
                     # Ak heslo sedí, ale účet je neaktívny
+                    # Ak heslo sedí, ale účet je zablokovaný / neaktívny
                     if user.check_password(password) and not user.is_active:
-                        raise ValidationError(
-                            "Váš účet ešte nie je aktivovaný. Prosím, kliknite na potvrdzovací link v e-maile.",
-                            code='not_activated',
-                        )
+                        # Ak nemá vytvorený profil alebo bol účet deaktivovaný správcom/nahlásením (už mal aktivovaný e-mail)
+                        # Pozrieme sa, či bol účet v minulosti zablokovaný alebo nebol vôbec aktivovaný z e-mailu
+                        if hasattr(user, 'profile') and user.last_login is not None:
+                            raise ValidationError(
+                                "Váš účet bol zablokovaný administrátorom za porušenie pravidiel.",
+                                code='banned',
+                            )
+                        else:
+                            raise ValidationError(
+                                "Váš účet ešte nie je aktivovaný. Prosím, kliknite na potvrdzovací link v e-maile.",
+                                code='not_activated',
+                            )
                 
                 # Ak je to proste len zlé heslo alebo meno, vrátime štandardnú chybu
                 raise ValidationError(

@@ -6,6 +6,7 @@ from inzeraty.models import Inzerat
 from django.contrib.auth.models import User
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from django.utils.encoding import force_bytes, force_str
+from django.utils.html import strip_tags
 from django.contrib.auth.tokens import default_token_generator
 from django.core.mail import send_mail
 from django.contrib import messages
@@ -17,6 +18,7 @@ from .models import Report
 from django.contrib.auth.forms import PasswordChangeForm
 from django.contrib.auth import update_session_auth_hash
 from django.conf import settings
+
 
 class MyLoginView(auth_views.LoginView):
     def form_valid(self, form):
@@ -118,6 +120,68 @@ def profil(request):
         return render(request, 'accounts/recenzie_partial.html', context)
 
     return render(request, 'accounts/profil.html', context)
+
+def forgot_password(request):
+    if request.method == 'POST':
+        email = request.POST.get('email')
+        associated_users = User.objects.filter(email=email)
+        
+        if associated_users.exists():
+            for user in associated_users:
+                token = default_token_generator.make_token(user)
+                uid = urlsafe_base64_encode(force_bytes(user.pk))
+                domain = request.get_host()
+                link = f"http://{domain}/accounts/reset/{uid}/{token}/"
+                
+                subject = 'Obnovenie hesla'
+                
+                # 1. HTML verzia e-mailu s tlačidlom a pekným dizajnom
+                html_message = f"""
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="utf-8">
+                </head>
+                <body style="font-family: Arial, sans-serif; background-color: #f4f4f4; margin: 0; padding: 20px;">
+                    <div style="max-width: 500px; margin: 0 auto; background-color: #ffffff; padding: 30px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+                        <h2 style="color: #333333; text-align: center; margin-top: 0;">Obnovenie hesla</h2>
+                        <p style="color: #555555; font-size: 15px; line-height: 1.5;">Ahoj <strong>{user.username}</strong>,</p>
+                        <p style="color: #555555; font-size: 15px; line-height: 1.5;">Dostali sme žiadosť o obnovenie hesla pre tvoj účet. Pre nastavenie nového hesla klikni na tlačidlo nižšie:</p>
+                        
+                        <!-- TLAČIDLO -->
+                        <div style="text-align: center; margin: 30px 0;">
+                            <a href="{link}" style="background-color: #0d6efd; color: #ffffff; text-decoration: none; padding: 12px 25px; border-radius: 5px; font-weight: bold; display: inline-block; font-size: 16px;">Obnoviť heslo</a>
+                        </div>
+                        
+                        <p style="color: #777777; font-size: 13px; line-height: 1.5;">Ak ti tlačidlo nefunguje, skopíruj a vlož tento odkaz do prehliadača:<br>
+                        <a href="{link}" style="color: #0d6efd;">{link}</a></p>
+                        
+                        <hr style="border: none; border-top: 1px solid #eeeeee; margin: 25px 0;">
+                        <p style="color: #999999; font-size: 12px; text-align: center; margin-bottom: 0;">Ak si o zmenu hesla nežiadal/a, tento e-mail môžeš bez obáv ignorovať.</p>
+                    </div>
+                </body>
+                </html>
+                """
+                
+                # 2. Textová verzia pre starších poštových klientov (vygeneruje sa automaticky z HTML)
+                plain_message = strip_tags(html_message)
+                
+                # 3. Odoslanie e-mailu s html_message
+                send_mail(
+                    subject, 
+                    plain_message, 
+                    settings.DEFAULT_FROM_EMAIL, 
+                    [user.email],
+                    html_message=html_message
+                )
+        
+        messages.info(request, 'Ak e-mail v systéme existuje, poslali sme vám pokyny na obnovenie hesla.')
+        return redirect('login')
+        
+    return redirect('login')
+
+
+
 
 def verejny_profil(request, username):
     pouzivatel = get_object_or_404(User, username=username)
@@ -297,3 +361,22 @@ def rozsirene_nastavenia(request):
     return render(request, 'accounts/rozsirene_nastavenia.html', {
         'password_form': password_form
     })
+
+
+LIMIT_NAHLASENI_PRE_BAN = 5  # Nastav požadovaný počet nahlásení pre ban
+
+def _skontroluj_a_zablokuj_pouzivatela_ak_treba(obvineny_user):
+    """Spočíta schválené / nevyriešené nahlásenia používateľa a ak presiahnu limit, zablokuje ho."""
+    if not obvineny_user or obvineny_user.is_staff:
+        return
+
+    # Počet unikátnych nahlásení na daného používateľa
+    pocet_nahlaseni = Report.objects.filter(obvineny=obvineny_user, vyresene=False).values('zalobca').distinct().count()
+
+    if pocet_nahlaseni >= LIMIT_NAHLASENI_PRE_BAN:
+        # 1. Zablokovanie prihlasovania používateľa
+        obvineny_user.is_active = False
+        obvineny_user.save(update_fields=['is_active'])
+
+        # 2. Deaktivácia všetkých jeho inzerátov
+        Inzerat.objects.filter(autor=obvineny_user).update(je_aktivny=False, status='Zamietnutý', dovod_zamietnutia='Automatický ban za vysoký počet nahlásení.')

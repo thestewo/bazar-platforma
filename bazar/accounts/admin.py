@@ -1,31 +1,29 @@
 from django.contrib import admin
-from .models import Recenzia, Report
+from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
+from django.contrib.auth.models import User
 from django.utils.html import format_html
 from django.urls import reverse
+from .models import Recenzia, Report
 
 admin.site.register(Recenzia)
 
+
+
+# ==========================================================================
+# --- REPORT ADMIN ---
+# ==========================================================================
+
 @admin.register(Report)
 class ReportAdmin(admin.ModelAdmin):
-    # 1. Zobrazenie v tabuľke (pridaný stĺpec pre cieľ nahlásenia a dynamické linky)
     list_display = ('id', 'get_target_user', 'zalobca', 'get_object_type', 'dovod', 'vytvorene', 'vyriesene', 'link_na_web')
-    
-    # 2. Inteligentné zoskupovanie a filtrovanie (rozšírené o odosielateľa správy)
     list_filter = ('vyriesene', 'dovod', 'vytvorene', 'obvineny', 'inzerat__autor', 'sprava__odosielatel')
-    
-    # Rozšírené vyhľadávanie aj o názvy inzerátov, texty správ a ich autorov
     search_fields = ('obvineny__username', 'zalobca__username', 'inzerat__nazov', 'inzerat__autor__username', 'sprava__text', 'sprava__odosielatel__username')
-    
-    # Možnosť rýchlo odklikať vyriešené nahlásenia priamo zo zoznamu
-    list_editable = ('vyriesene',)
-    
-    # Zoradenie: najprv nevyriešené, potom pod seba zoskupí podľa cieľov incidentu
     ordering = ('vyriesene', 'obvineny', 'inzerat__autor', 'sprava__odosielatel', '-vytvorene')
-    
-    # Polia, ktoré v detaile nahlásenia admin nemôže prepisovať
     readonly_fields = ('vytvorene', 'zalobca', 'obvineny', 'inzerat', 'sprava', 'dovod', 'popis', 'link_na_web')
     
-    # Prehľadné rozdelenie detailu nahlásenia do sekcií
+    # PRIDANÉ: Hromadné akcie pre rýchlu správu zoznamu
+    actions = ['oznacit_ako_vyriesene', 'zablokovat_obvinenych_pouzivatelov']
+
     fieldsets = (
         ('Detaily incidentu', {
             'fields': ('zalobca', 'obvineny', 'inzerat', 'sprava', 'dovod', 'popis', 'vytvorene')
@@ -38,8 +36,45 @@ class ReportAdmin(admin.ModelAdmin):
         }),
     )
 
+    # --- AKCIE ---
+
+    @admin.action(description="Označiť vybrané nahlásenia ako VYRIEŠENÉ")
+    def oznacit_ako_vyriesene(self, request, queryset):
+        pocet = queryset.update(vyriesene=True)
+        self.message_user(request, f"{pocet} nahlásení bolo označených ako vyriešené.")
+
+    @admin.action(description="ZABLOKOVAŤ obvinených používateľov a deaktivovať ich inzeráty")
+    def zablokovat_obvinenych_pouzivatelov(self, request, queryset):
+        zablokovani = 0
+        for report in queryset:
+            # Určíme obvineného používateľa (priamo, z inzerátu alebo zo správy)
+            obvineny = report.obvineny
+            if not obvineny and report.inzerat:
+                obvineny = report.inzerat.autor
+            elif not obvineny and report.sprava:
+                obvineny = report.sprava.odosielatel
+
+            if obvineny and not obvineny.is_staff and obvineny.is_active:
+                # 1. Zablokujeme prihlásenie
+                obvineny.is_active = False
+                obvineny.save(update_fields=['is_active'])
+                
+                # 2. Skryjeme všetky jeho inzeráty
+                Inzerat.objects.filter(autor=obvineny).update(
+                    je_aktivny=False, 
+                    status='Zamietnutý', 
+                    dovod_zamietnutia='Zablokovaný adminom na základe nahlásení.'
+                )
+                zablokovani += 1
+                
+        # Označíme spracované nahlásenia ako vyriešené
+        queryset.update(vyriesene=True)
+        self.message_user(request, f"Bolo zablokovaných {zablokovani} používateľov a ich nahlásenia boli vyriešené.")
+
+
+    # --- ZOBRAZOVACIE METÓDY ---
+
     def get_target_user(self, obj):
-        """Vráti meno používateľa, na ktorého sa sťažnosť sype (či už priamo, cez inzerát, alebo cez správu)."""
         if obj.sprava:
             return format_html('<b>{}</b> <span style="color:#aaa;">(cez správu)</span>', obj.sprava.odosielatel.username)
         if obj.inzerat:
@@ -50,7 +85,6 @@ class ReportAdmin(admin.ModelAdmin):
     get_target_user.short_description = 'Nahlásený používateľ'
 
     def get_object_type(self, obj):
-        """Rozlíši v zozname na prvý pohľad, či ide o nahlásenie človeka, inzerátu alebo správy."""
         if obj.sprava:
             return format_html('<span style="background:#198754; color:#fff; padding:2px 6px; border-radius:3px; font-size:11px;">SPRÁVA</span>')
         if obj.inzerat:
@@ -59,14 +93,10 @@ class ReportAdmin(admin.ModelAdmin):
     get_object_type.short_description = 'Typ objektu'
 
     def link_na_web(self, obj):
-        """Univerzálne tlačidlo: presmeruje admina na detail inzerátu, profilu alebo priamo do chatu."""
         if obj.sprava:
-            # OPRAVA: Odovzdávame ID inzerátu a GET parameter zujemca_id (kupujúceho)
             inzerat_id = obj.sprava.konverzacia.inzerat.pk
-            kupujuci_id = obj.sprava.konverzacia.kupujuci.pk  # Prípadne obj.sprava.konverzacia.kupujuci.pk podľa vašich názvov polí
-            
+            kupujuci_id = obj.sprava.konverzacia.kupujuci.pk
             url = f"{reverse('chat_detail', kwargs={'inzerat_id': inzerat_id})}?kupujuci_id={kupujuci_id}"
-            
             return format_html(
                 '<a href="{}" target="_blank" class="button" style="padding:3px 10px; background:#a370f7; color:#fff; font-weight:bold; border-radius:4px; text-decoration:none;">Zobraziť chat</a>', 
                 url
@@ -84,5 +114,29 @@ class ReportAdmin(admin.ModelAdmin):
                 url
             )
         return "-"
-    
     link_na_web.short_description = 'Odkaz na web'
+
+
+# ==========================================================================
+# --- ROZŠÍRENIE USER ADMINA O MOŽNOSŤ ODBLOKOVANIA ---
+# ==========================================================================
+
+# Odregistrujeme základného UserAdmina
+admin.site.unregister(User)
+
+@admin.register(User)
+class CustomUserAdmin(BaseUserAdmin):
+    list_display = ('username', 'email', 'is_active', 'is_staff', 'last_login')
+    list_editable = ('is_active', )
+    list_filter = ('is_active', 'is_staff', 'last_login')
+    actions = ['odblokovat_pouzivatelov', 'zablokovat_pouzivatelov']
+
+    @admin.action(description="ODBLOKOVAŤ vybraných používateľov")
+    def odblokovat_pouzivatelov(self, request, queryset):
+        updated = queryset.update(is_active=True)
+        self.message_user(request, f"{updated} používateľov bolo úspešne odblokovaných.")
+
+    @admin.action(description="ZABLOKOVAŤ vybraných používateľov")
+    def zablokovat_pouzivatelov(self, request, queryset):
+        updated = queryset.filter(is_staff=False).update(is_active=False)
+        self.message_user(request, f"{updated} používateľov bolo zablokovaných.")
