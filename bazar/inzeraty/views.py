@@ -88,9 +88,15 @@ def _vyhodnot_ai_kontrolu(form, hlavna_foto, vedlajsie_fotky):
 
     try:
         vysledok = hlavna_kontrola_obsahu(skumany_text, fotky_pre_ai)
-        return vysledok.get('status', 'Schválený'), vysledok.get('dovod', ''), False
+        dovod = vysledok.get('dovod', '')
+        stav = str(vysledok.get('status', '')).strip().lower()
+        if stav.startswith('zamiet'):
+            return 'Zamietnutý', dovod, False
+        if stav.startswith('schv') or vysledok.get('schvalene') is True:
+            return 'Schválený', dovod, False
+        return 'Karanténa', dovod, True
     except Exception as ai_error:
-        return 'Karanténa', f"AI zlyhalo: {str(ai_error)}", True
+        return 'Karanténa', f"AI zlyhalo: {str(ai_error)}"[:200], True
 
 def _ulozi_inzerat_s_lokalitou_a_fotkami(inzerat, form, surova_lokalita, hlavna_foto, vedlajsie_fotky, stara_lokalita=None):
     """Pomocná funkcia na uloženie inzerátu, geolokácie a obrázkov."""
@@ -124,6 +130,17 @@ def _ulozi_inzerat_s_lokalitou_a_fotkami(inzerat, form, surova_lokalita, hlavna_
 # ==========================================================================
 # --- INZERÁTY (Pridanie, Úprava, Mazanie) ---
 # ==========================================================================
+def _odpoved_po_ulozeni(inzerat):
+    """Schválený inzerát ide na detail, ostatné na profil s vysvetlením."""
+    if inzerat.status == 'Schválený':
+        return JsonResponse({'status': 'success', 'success': True,
+                             'redirect_url': reverse('detail_inzeratu', kwargs={'pk': inzerat.id})})
+    return JsonResponse({
+        'status': 'success', 'success': True,
+        'redirect_url': reverse('profil'),
+        'info_message': 'Inzerát bol uložený, no pred zverejnením ho musí skontrolovať administrátor. '
+                        'Zobrazí sa hneď po schválení.',
+    })
 
 @login_required
 def pridat_inzerat(request):
@@ -145,12 +162,13 @@ def pridat_inzerat(request):
                     inzerat = form.save(commit=False)
                     inzerat.autor = request.user
                     inzerat.status, inzerat.dovod_zamietnutia, inzerat.kontrola_zlyhala = status, dovod, kontrola_zlyhala
+                    inzerat.je_aktivny = (status == 'Schválený')
                     
                     inzerat = _ulozi_inzerat_s_lokalitou_a_fotkami(
                         inzerat, form, request.POST.get('lokalita', ''), hlavna_foto, vedlajsie_fotky
                     )
 
-                return JsonResponse({'status': 'success', 'success': True, 'redirect_url': reverse('detail_inzeratu', kwargs={'pk': inzerat.id})})
+                return _odpoved_po_ulozeni(inzerat)
             except Exception as celkova_chyba:
                 return JsonResponse({'error': f'Systémová chyba pri ukladaní: {str(celkova_chyba)}'}, status=500)
                 
@@ -185,6 +203,8 @@ def upravit_inzerat(request, pk):
             try:
                 with transaction.atomic():
                     inzerat.status, inzerat.dovod_zamietnutia, inzerat.kontrola_zlyhala = status, dovod, kontrola_zlyhala
+                    if vyzaduje_ai and status != 'Schválený':
+                        inzerat.je_aktivny = False
                     if hlavna_foto and stara_hlavna_fotka:
                         stare_fotky_na_zmazanie.append(stara_hlavna_fotka)
 
@@ -199,7 +219,7 @@ def upravit_inzerat(request, pk):
                 for f in stare_fotky_na_zmazanie:
                     _bezpecne_zmaz_subor(f)
 
-                return JsonResponse({'status': 'success', 'success': True, 'redirect_url': reverse('detail_inzeratu', kwargs={'pk': inzerat.id})})
+                return _odpoved_po_ulozeni(inzerat)
             except Exception as celkova_chyba:
                 traceback.print_exc()
                 return JsonResponse({'error': f'Systémová chyba pri úprave: {str(celkova_chyba)}'}, status=500)
@@ -235,6 +255,8 @@ def detail_inzeratu(request, pk):
 def predlzit_inzerat(request, pk):
     if request.method == 'POST':
         inzerat = get_object_or_404(Inzerat, pk=pk, autor=request.user)
+        if inzerat.status in ('Karanténa', 'Zamietnutý', 'caka_na_kontrolu'):
+            return HttpResponse(status=403)   # neschválený inzerát si autor nemôže sám zverejniť
         inzerat.vytvorene, inzerat.je_aktivny = timezone.now(), True
         inzerat.save(update_fields=['vytvorene', 'je_aktivny'])
         return redirect('profil')

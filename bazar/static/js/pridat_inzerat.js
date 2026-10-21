@@ -172,7 +172,7 @@ document.addEventListener('DOMContentLoaded', function() {
         canvas.toBlob(blob => {
             const file = new File([blob], `img_${Date.now()}.jpg`, { type: "image/jpeg" });
             croppedBlobs.push(file);
-            window.nahraneFotky = croppedBlobs; // Synchronizácia
+            window.nahraneFotky = croppedBlobs;
             renderPreviews();
             updateInterface();
             cropModal?.classList.add('d-none');
@@ -185,7 +185,7 @@ document.addEventListener('DOMContentLoaded', function() {
         processNextFile();
     });
 
-    // --- 4. RENDER A ROZHRANIE ---
+    // --- 6. RENDER A ROZHRANIE ---
     function renderPreviews() {
         if (!previews) return;
         previews.innerHTML = "";
@@ -211,7 +211,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             croppedBlobs.splice(index, 1);
-            window.nahraneFotky = croppedBlobs; // Synchronizácia
+            window.nahraneFotky = croppedBlobs;
             renderPreviews();
             updateInterface();
         };

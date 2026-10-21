@@ -16,8 +16,17 @@ document.addEventListener('DOMContentLoaded', function () {
             .then(res => res.text())
             .then(html => {
                 document.getElementById('recenzie-list').innerHTML = html;
-                window.history.pushState({}, '', url);
+                window.history.pushState({ sort: sortType }, '', url);
             });
+    };
+
+    // Obsluha tlačidla "späť" v prehliadači
+    window.onpopstate = function(event) {
+        if (event.state && event.state.sort) {
+            window.nacitajRecenzie(event.state.sort);
+        } else {
+            location.reload();
+        }
     };
 
     window.zmazatRecenziu = (id) => {
@@ -64,6 +73,7 @@ document.addEventListener('DOMContentLoaded', function () {
             body: formData,
             headers: { 'X-CSRFToken': formData.get('csrfmiddlewaretoken') }
         })
+        
         .then(res => {
             if (!res.ok) throw new Error();
             
@@ -88,4 +98,12 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Reset report formulára po zatvorení modalu
     document.getElementById('reportModal')?.addEventListener('hidden.bs.modal', () => reportForm?.reset());
+});
+
+
+
+// Inicializácia Bootstrap Popoverov (pre rizikových používateľov)
+document.addEventListener('DOMContentLoaded', function() {
+    const popoverTriggerList = document.querySelectorAll('[data-bs-toggle="popover"]');
+    [...popoverTriggerList].map(popoverTriggerEl => new bootstrap.Popover(popoverTriggerEl));
 });

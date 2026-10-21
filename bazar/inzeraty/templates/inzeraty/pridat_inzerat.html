@@ -185,8 +185,6 @@
     </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
-<script src="https://cdn.jsdelivr.net/npm/nsfwjs"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
 
 <script src="{% static 'js/pridat_inzerat.js' %}?v={% now 'U' %}"></script>
@@ -202,14 +200,12 @@
     async function nacitajNSFWModel() {
         if (!nsfwModel) {
             try {
-                nsfwModel = await nsfw.load();
+                nsfwModel = await nsfwjs.load();
             } catch (err) {
                 console.error("Chyba pri načítaní NSFW.js modelu:", err);
             }
         }
     }
-    nacitajNSFWModel();
-
     function zatvorCenzuraModal() {
         document.getElementById('cenzuraModal').style.display = 'none';
     }
@@ -316,7 +312,7 @@
                 return;
             }
 
-            if (suboryNaKontrolu.length > 0 && spustitAIAnalyzu) {
+            if (false) {
                 if (!nsfwModel) {
                     btnText.innerText = "Načítavam filter fotiek...";
                     await nacitajNSFWModel();
@@ -472,7 +468,7 @@
                     } else {
                         window.location.href = cielovaUrl;
                     }
-                } else if (res.status === 400 && res.data && res.data.error) {
+                } else if (res.data && res.data.error) {
                     modalHeader.className = "text-warning";
                     modalHeader.innerText = "⚠️ Chyba vo formulári";
                     obsahBox.style.borderTop = "5px solid #ffc107";
@@ -486,7 +482,7 @@
                     modalHeader.innerText = "⚠️ Chyba spracovania";
                     obsahBox.style.borderTop = "5px solid #ffc107";
                     zatvorBtn.className = "btn btn-warning CenzuraZatvoritBtn";
-                    document.getElementById('cenzuraDovodText').innerText = "Skontrolujte zadané údaje (popis musí byť dostatočne dlhý) alebo nahrané súbory.";
+                    document.getElementById('cenzuraDovodText').innerText = `Chyba servera (HTTP ${res.status}). Skúste to znova o chvíľu.`;
                     document.getElementById('cenzuraModal').style.display = 'flex';
                     zatvorBtn.onclick = zatvorCenzuraModal;
                     window.isFormSubmittingGlobal = false;

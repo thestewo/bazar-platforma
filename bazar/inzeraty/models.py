@@ -7,6 +7,7 @@ import os
 from django.db.models.signals import post_delete, pre_save
 from django.dispatch import receiver
 from PIL import Image
+from django.core.validators import MinValueValidator
 
 class Kategoria(models.Model):
     nazov = models.CharField(max_length=100)
@@ -29,7 +30,7 @@ class Typ(models.Model):
 class Inzerat(models.Model):
     nazov = models.CharField(max_length=50)
     popis = models.TextField()
-    cena = models.DecimalField(max_digits=10, decimal_places=2)
+    cena = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(0, message="Cena nemôže byť záporná.")])
     kategoria = models.ForeignKey('Kategoria', on_delete=models.SET_NULL, null=True, blank=True) 
     typ = models.ForeignKey('Typ', on_delete=models.SET_NULL, null=True, blank=True)
     vytvorene = models.DateTimeField(auto_now_add=True)
@@ -127,7 +128,7 @@ def auto_delete_file_on_change_or_deactivation(sender, instance, **kwargs):
     stary_obrazok = None
 
     if old_instance.je_aktivny and not instance.je_aktivny:
-        if old_instance.obrazok:
+        if old_instance.obrazok and instance.status == 'Schválený':
             stary_obrazok = old_instance.obrazok
             
     elif old_instance.obrazok and old_instance.obrazok != instance.obrazok:

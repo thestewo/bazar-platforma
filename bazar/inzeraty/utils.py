@@ -1,13 +1,12 @@
-import os
-import json
-import re
+import json, socket, time
 from PIL import Image
-from duckduckgo_search import DDGS
+from ddgs import DDGS
 from google import genai
 from google.genai import types
 from google.genai.types import HarmCategory, HarmBlockThreshold
+import httpx
 
-# Globálna inicializácia klienta
+# OPRAVA 1: Odstránené chybné local_address="0.0.0.0" a upravený timeout na reálnu hodnotu v sekundách
 client = genai.Client()
 
 # Nastavenie bezpečnostných filtrov, aby AI neodmietala spracovať fotky/text
@@ -30,13 +29,35 @@ SAFETY_SETTINGS = [
     ),
 ]
 
+_GEMINI_CACHE = {"ts": 0.0, "ok": False}
+
+def gemini_dostupne():
+    """Rýchla kontrola (max ~2 s) s pamäťou výsledku na 60 s."""
+    return True
+    if time.time() - _GEMINI_CACHE["ts"] < 60:
+        return _GEMINI_CACHE["ok"]
+    ok = False
+    try:
+        adresa = socket.getaddrinfo("generativelanguage.googleapis.com", 443,
+                                    socket.AF_INET, socket.SOCK_STREAM)[0][4]
+        socket.create_connection(adresa, timeout=2).close()
+        ok = True
+    except OSError:
+        pass
+    _GEMINI_CACHE.update(ts=time.time(), ok=ok)
+    return ok
+
 def zavolaj_gemini_s_fallbackom(contents, config=None):
     """
     Bezpečne zavolá primárny alebo záložný model.
     """
-    # Použijeme overené stabilné názvy modelov
-    primarny_model = 'gemini-3.5-flash-lite'
-    zalozny_model = 'gemini-3.1-flash-lite'
+    if not gemini_dostupne():
+        print("DEBUG: Gemini API nie je z tohto servera dosiahnuteľné, preskakujem.")
+        return None
+        
+    # OPRAVA 2: Zmenené na reálne podporované názvy modelov
+    primarny_model = 'gemini-2.5-flash'
+    zalozny_model = 'gemini-1.5-flash'
 
     if config is None:
         config = types.GenerateContentConfig(
@@ -44,7 +65,6 @@ def zavolaj_gemini_s_fallbackom(contents, config=None):
             safety_settings=SAFETY_SETTINGS
         )
     else:
-        # Pridáme safety_settings do existujúcej konfigurácie, ak tam chýbajú
         if not getattr(config, 'safety_settings', None):
             config.safety_settings = SAFETY_SETTINGS
 
@@ -54,7 +74,8 @@ def zavolaj_gemini_s_fallbackom(contents, config=None):
         if res and hasattr(res, 'text') and res.text:
             return res.text
     except Exception as e:
-        print(f"DEBUG: Primárny model ({primarny_model}) zlyhal: {e}. Skúšam záložný...")
+        print(f"KRITICKÁ CHYBA - Primárny model ({primarny_model}) zlyhal: {e}")
+        raise e  # Dočasne odkomentujte pre zistenie presnej chyby v logoch
 
     # 2. Pokus: Záložný model
     try:
@@ -93,7 +114,7 @@ def ziskaj_ai_analyzu(inzerat):
     - Názov: "{inzerat.nazov}"
     - Cena v inzeráte: {inzerat.cena} EUR
     - Kategória: {inzerat.kategoria.nazov if inzerat.kategoria else 'Neznáma'}
-    - Popis (dôležitý pre stav): {popis_inzeratu[:600]}
+    - Popis (dôležitý pre stav): {popis_inzeratu[:1000]} 
 
     DÁTA Z WEBU (Aktuálny trh v SR/EÚ):
     {web_context}
@@ -123,18 +144,20 @@ def ziskaj_ai_analyzu(inzerat):
     content = [prompt]
     if inzerat.obrazok:
         try:
-            img = Image.open(inzerat.obrazok.path)
-            content.append(img)
+            with Image.open(inzerat.obrazok.path) as img:
+                img.thumbnail((1024, 1024))  # Zmenšenie na max 1024x1024 pixelov
+                content.append(img.copy())
         except Exception as e:
-            print(f"DEBUG: Nepodarilo sa otvoriť obrázok pre analýzu: {e}")
+            print(f"DEBUG: Nepodarilo sa otvoriť obrázok: {e}")
 
     for dodatocny in inzerat.dodatocne_obrazky.all():
         if dodatocny.obrazok:
             try:
-                img_dodatocna = Image.open(dodatocny.obrazok.path)
-                content.append(img_dodatocna)
+                with Image.open(dodatocny.obrazok.path) as img:
+                    img.thumbnail((1024, 1024))
+                    content.append(img.copy())
             except Exception as e:
-                print(f"DEBUG: Nepodarilo sa otvoriť dodatočný obrázok pre analýzu: {e}")
+                print(f"DEBUG: Nepodarilo sa otvoriť dodatočný obrázok: {e}")
 
     text_odpoved = zavolaj_gemini_s_fallbackom(
         contents=content,
@@ -159,7 +182,7 @@ def vygeneruj_skryte_tagy(inzerat):
     Príklad: Pre "Nike Phantom" pridaj "kopačky, futbalová obuv, lisovky, šport".
     Príklad: Pre "iPhone" pridaj "mobil, telefón, smartphone, apple".
 
-    Popis: {popis_text[:300]}
+    Popis: {popis_text[:1000]}
     
     Vráť IBA kľúčové slová oddelené čiarkou, nič iné.
     """

@@ -1,6 +1,6 @@
-from django.contrib.auth.forms import UserCreationForm
+import re
+from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
 from django.contrib.auth.models import User
-from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth import authenticate
 from django import forms
 from .models import Profile
@@ -18,13 +18,13 @@ class RegisterForm(UserCreationForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        
+
+
         # 1. Hromadné pridanie Bootstrap triedy pre všetky polia
+
         for name, field in self.fields.items():
-            if name == 'suhlas':
-                field.widget.attrs.update({'class': 'form-check-input'})
-            else:
-                field.widget.attrs.update({'class': 'form-control'})
+            css_class = 'form-check-input' if name == 'suhlas' else 'form-control'
+            field.widget.attrs.update({'class': css_class})
             
         # 2. Preklad labelov pre heslá
         self.fields['password1'].label = "Heslo"
@@ -50,7 +50,6 @@ class RegisterForm(UserCreationForm):
                     "Registrácia je povolená iba pre školské e-mailové adresy s doménou @gbst.sk."
                 )
         
-        # Ak už existuje používateľ s rovnakým e-mailom (voliteľná kontrola, ak chceš unikátne e-maily)
         if User.objects.filter(email=email).exists():
             raise forms.ValidationError("Používateľ s týmto e-mailom už existuje.")
 
@@ -59,12 +58,29 @@ class RegisterForm(UserCreationForm):
 class UserUpdateForm(forms.ModelForm):
     class Meta:
         model = User
-        fields = ['first_name', 'last_name', 'email']
+        fields = ['first_name', 'last_name']
 
 class ProfileUpdateForm(forms.ModelForm):
     class Meta:
         model = Profile
         fields = ['telefon', 'mesto']
+
+    def clean_telefon(self):
+        telefon = self.cleaned_data.get('telefon')
+        
+        if telefon:
+            ciste_cislo = re.sub(r'[\s\-\(\)]', '', telefon)
+
+            vzorka = r'^(?:\+421|00421|0)(?:9\d{8}|[2-5]\d{8})$'
+
+            if not re.match(vzorka, ciste_cislo):
+                raise ValidationError(
+                    "Zadajte platné telefónne číslo (napr. 0912 345 678 alebo +421 912 345 678)."
+                )
+
+            return ciste_cislo
+
+        return telefon
 
 class CustomLoginForm(AuthenticationForm):
     username = forms.CharField(label="Používateľské meno", widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Zadajte meno'}))
@@ -78,31 +94,17 @@ class CustomLoginForm(AuthenticationForm):
         password = self.cleaned_data.get('password')
 
         if username and password:
-            # Pokúsime sa overiť údaje
             self.user_cache = authenticate(self.request, username=username, password=password)
             
             if self.user_cache is None:
-                # Ak authenticate zlyhalo (vráti None), pozrieme sa prečo
-                user_exists = User.objects.filter(username=username).exists()
-                if user_exists:
+                user = User.objects.filter(username=username).first()
+                if user:
                     user = User.objects.get(username=username)
-                    # Ak heslo sedí, ale účet je neaktívny
-                    # Ak heslo sedí, ale účet je zablokovaný / neaktívny
                     if user.check_password(password) and not user.is_active:
-                        # Ak nemá vytvorený profil alebo bol účet deaktivovaný správcom/nahlásením (už mal aktivovaný e-mail)
-                        # Pozrieme sa, či bol účet v minulosti zablokovaný alebo nebol vôbec aktivovaný z e-mailu
                         if hasattr(user, 'profile') and user.last_login is not None:
-                            raise ValidationError(
-                                "Váš účet bol zablokovaný administrátorom za porušenie pravidiel.",
-                                code='banned',
-                            )
-                        else:
-                            raise ValidationError(
-                                "Váš účet ešte nie je aktivovaný. Prosím, kliknite na potvrdzovací link v e-maile.",
-                                code='not_activated',
-                            )
+                            raise ValidationError("Váš účet bol zablokovaný administrátorom za porušenie pravidiel.", code='banned')
+                        raise ValidationError("Váš účet ešte nie je aktivovaný. Prosím, kliknite na potvrdzovací link v e-maile.", code='not_activated')
                 
-                # Ak je to proste len zlé heslo alebo meno, vrátime štandardnú chybu
                 raise ValidationError(
                     self.error_messages['invalid_login'],
                     code='invalid_login',

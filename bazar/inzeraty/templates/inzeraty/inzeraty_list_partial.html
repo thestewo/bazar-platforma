@@ -5,7 +5,7 @@
             
             <div class="image-container d-flex align-items-center justify-content-center inzerat-img-container">
                 {% if inzerat.obrazok %}
-                    <img src="{{ inzerat.obrazok.url }}" class="w-100 h-100" alt="{{ inzerat.nazov }}">
+                    <img src="{{ inzerat.obrazok.url }}" loading="lazy" class="w-100 h-100" alt="{{ inzerat.nazov }}">
                 {% else %}
                     <i class="bi bi-image text-white-50" style="font-size: 3rem;"></i>
                 {% endif %}

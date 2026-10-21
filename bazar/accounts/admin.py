@@ -3,7 +3,7 @@ from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.models import User
 from django.utils.html import format_html
 from django.urls import reverse
-from .models import Recenzia, Report
+from .models import Recenzia, Report, Inzerat
 
 admin.site.register(Recenzia)
 
