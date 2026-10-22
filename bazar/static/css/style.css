@@ -78,7 +78,7 @@ div.d-inline-block:hover .dropdown button { opacity: 0.6 !important; }
 .inzerat-img-container {height: 280px; background-color: #212529; overflow: hidden;}
 .inzerat-img-container img {object-fit: contain; object-position: center; padding: 5px}
 .inzerat-title {max-width: 70%; font-size: 1rem;}
-.inzerat-card-popis {display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; max-height: 4.5em}
+.inzerat-card-popis {display: -webkit-box; -webkit-line-clamp: 3; line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; max-height: 4.5em}
 .inzerat-card-lokalita{max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: inline-block; vertical-align: bottom}
 
 
