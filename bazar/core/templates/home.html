@@ -8,7 +8,19 @@
 <div class="card bg-dark border-secondary shadow-lg mb-5 filter-card">
     <div class="card-body p-4">
         <form method="GET" action="{% url 'home' %}" class="row g-3 align-items-end" id="filterForm">
-            <div class="col-lg-3 col-md-6">
+            
+            <!-- 1. KĽÚČOVÉ SLOVO -->
+            <div class="col-lg-3 col-md-6 col-12">
+                <label class="form-label text-white-50 small">Čo hľadáte?</label>
+                <div class="input-group">
+                    <span class="input-group-text bg-dark border-secondary text-white-50"><i class="bi bi-search"></i></span>
+                    <input type="text" name="q" class="form-control bg-dark text-white border-secondary" 
+                        placeholder="Zadajte názov inzerátu..." value="{{ request.GET.q|default:'' }}">
+                </div>
+            </div>
+
+            <!-- 2. TYP INZERÁTU -->
+            <div class="col-lg-3 col-md-6 col-12">
                 <label class="form-label text-white-50 small d-block">Typ inzerátu</label>
                 <div class="btn-group w-100" role="group">
                     <input type="radio" class="btn-check" name="typ" id="typ_vsetky" value="" 
@@ -18,89 +30,97 @@
                     {% for t in typy %}
                     <input type="radio" class="btn-check" name="typ" id="typ_{{ t.id }}" value="{{ t.id }}" 
                         {% if request.GET.typ == t.id|stringformat:"i" %}checked{% endif %} onchange="this.form.submit()">
-                    <label class="btn btn-outline-secondary" for="typ_{{ t.id }}">{{ t.nazov }}</label>
+                    <label class="btn {% if t.nazov == 'Predaj' %}btn-outline-predaj{% elif t.nazov == 'Kúpa' %}btn-outline-kupa{% else %}btn-outline-secondary{% endif %}" for="typ_{{ t.id }}">
+                        {{ t.nazov }}
+                    </label>
                     {% endfor %}
                 </div>
             </div>
 
-            <div class="col-lg-3 col-md-6">
-                <label class="form-label text-white-50 small">Kľúčové slovo</label>
-                <div class="input-group">
-                    <span class="input-group-text bg-dark border-secondary text-white-50"><i class="bi bi-search"></i></span>
-                    <input type="text" name="q" class="form-control bg-dark text-white border-secondary" 
-                        placeholder="Hľadať..." value="{{ request.GET.q|default:'' }}">
-                </div>
-            </div>
-
-            <div class="col-lg-3 col-md-6">
-                <label class="form-label text-white-50 small">Kategória</label>
-                <select name="kategoria" class="form-select bg-dark text-white border-secondary">
-                    <option value="">Všetky kategórie</option>
-                    {% for kat in kategorie %}
-                        <option value="{{ kat.id }}" {% if request.GET.kategoria == kat.id|stringformat:"i" %}selected{% endif %}>
-                            {{ kat.nazov }}
-                        </option>
-                    {% endfor %}
-                </select>
-            </div>
-
-            <div class="col-lg-3 col-md-6">
-                <label class="form-label text-white-50 small">Cena (€)</label>
-                <div class="input-group">
-                    <input type="number" name="min_cena" class="form-control bg-dark text-white border-secondary" 
-                        placeholder="Od" value="{{ request.GET.min_cena }}">
-                    <input type="number" name="max_cena" class="form-control bg-dark text-white border-secondary" 
-                        placeholder="Do" value="{{ request.GET.max_cena }}">
-                </div>
-            </div>
-
-            <!-- 2. RIADOK (4 rovnako široké stĺpce na PC) -->
-            <div class="col-lg-3 col-md-6">
-                <label class="form-label text-white-50 small">Lokalita</label>
-                <div class="input-group">
-                    <span class="input-group-text bg-dark border-secondary text-white-50"><i class="bi bi-geo-alt"></i></span>
-                    <input type="text" id="filter-lokalita" name="l" class="form-control bg-dark text-white border-secondary" 
-                        placeholder="Mesto alebo PSČ" value="{{ request.GET.l|default:'' }}">
-                    <button type="button" class="btn btn-outline-info" onclick="zistitPolohuFiltra(event)">
-                        <i class="bi bi-geo-alt-fill"></i> Spresniť
-                    </button>
-                </div>
-            </div>
-
-            <div class="col-lg-3 col-md-6">
-                <label class="form-label text-white-50 small">Okolie (km)</label>
-                <div class="input-group">
-                    <input type="number" name="r" class="form-control bg-dark text-white border-secondary" 
-                           placeholder="km" min="0" max="15000" value="{{ request.GET.r|default:'' }}">
-                    <span class="input-group-text bg-dark border-secondary text-white-50">km</span>
-                </div>
-            </div>
-
-            <div class="col-lg-3 col-md-6">
-                <label class="form-label text-white-50 small">Zoradiť podľa</label>
-                <select name="zoradenie" class="form-select bg-dark text-white border-secondary" onchange="this.form.submit()">
-                    <option value="najnovsie" {% if request.GET.zoradenie == 'najnovsie' or not request.GET.zoradenie %}selected{% endif %}>
-                        Najnovšie
-                    </option>
-                    <option value="cena_asc" {% if request.GET.zoradenie == 'cena_asc' %}selected{% endif %}>
-                        Cena: od najlacnejších
-                    </option>
-                    <option value="cena_desc" {% if request.GET.zoradenie == 'cena_desc' %}selected{% endif %}>
-                        Cena: od najdrahších
-                    </option>
-                </select>
-            </div>
-
-            <div class="col-lg-3 col-md-6 d-flex gap-2">
-                <button type="submit" class="btn btn-primary w-100 fw-bold">
-                    <i class="bi bi-funnel-fill me-2"></i>Filtrovať
+            <!-- MOBILNÉ TLAČIDLO PRE POKROČILÉ FILTRE (Iba na mobile) -->
+            <div class="col-12 d-lg-none">
+                <button class="btn btn-outline-info w-100 py-2" type="button" data-bs-toggle="collapse" data-bs-target="#advancedFilters" aria-expanded="false" aria-controls="advancedFilters">
+                    <i class="bi bi-sliders me-2"></i>Pokročilé filtre 
+                    {% if request.GET.kategoria or request.GET.l or request.GET.r or request.GET.min_cena or request.GET.max_cena %}
+                        <span class="badge bg-info text-dark ms-1">Aktívne</span>
+                    {% endif %}
                 </button>
-                {% if request.GET.q or request.GET.kategoria or request.GET.l or request.GET.r or request.GET.min_cena or request.GET.max_cena or request.GET.typ or request.GET.zoradenie %}
-                    <a href="{% url 'home' %}" class="btn btn-outline-danger px-3" title="Zrušiť filtre">
-                        <i class="bi bi-x-lg"></i>
-                    </a>
-                {% endif %}
             </div>
+
+            <!-- POKROČILÉ FILTRE (Na mobile zbalený riadok, na PC sa rozbalia priamo do 2 riadkov po 4 stĺpce) -->
+            <div class="collapse row g-3 d-lg-contents advanced-collapse" id="advancedFilters">
+                
+                <div class="col-lg-3 col-md-6 col-12">
+                    <label class="form-label text-white-50 small">Kategória</label>
+                    <select name="kategoria" class="form-select bg-dark text-white border-secondary">
+                        <option value="">Všetky kategórie</option>
+                        {% for kat in kategorie %}
+                            <option value="{{ kat.id }}" {% if request.GET.kategoria == kat.id|stringformat:"i" %}selected{% endif %}>
+                                {{ kat.nazov }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="col-lg-3 col-md-6 col-12">
+                    <label class="form-label text-white-50 small">Cena (€)</label>
+                    <div class="input-group">
+                        <input type="number" name="min_cena" class="form-control bg-dark text-white border-secondary" 
+                            placeholder="Od" value="{{ request.GET.min_cena }}">
+                        <input type="number" name="max_cena" class="form-control bg-dark text-white border-secondary" 
+                            placeholder="Do" value="{{ request.GET.max_cena }}">
+                    </div>
+                </div>
+
+                <div class="col-lg-3 col-md-6 col-12">
+                    <label class="form-label text-white-50 small">Lokalita</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-dark border-secondary text-white-50"><i class="bi bi-geo-alt"></i></span>
+                        <input type="text" id="filter-lokalita" name="l" class="form-control bg-dark text-white border-secondary" 
+                            placeholder="Mesto alebo PSČ" value="{{ request.GET.l|default:'' }}">
+                        <button type="button" class="btn btn-outline-info" onclick="zistitPolohuFiltra(event)" title="Zistiť moju polohu">
+                            <i class="bi bi-geo-alt-fill"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="col-lg-3 col-md-6 col-12">
+                    <label class="form-label text-white-50 small">Okolie (km)</label>
+                    <div class="input-group">
+                        <input type="number" name="r" class="form-control bg-dark text-white border-secondary" 
+                               placeholder="km" min="0" max="15000" value="{{ request.GET.r|default:'' }}">
+                        <span class="input-group-text bg-dark border-secondary text-white-50">km</span>
+                    </div>
+                </div>
+
+                <div class="col-lg-3 col-md-6 col-12">
+                    <label class="form-label text-white-50 small">Zoradiť podľa</label>
+                    <select name="zoradenie" class="form-select bg-dark text-white border-secondary" onchange="this.form.submit()">
+                        <option value="najnovsie" {% if request.GET.zoradenie == 'najnovsie' or not request.GET.zoradenie %}selected{% endif %}>
+                            Najnovšie
+                        </option>
+                        <option value="cena_asc" {% if request.GET.zoradenie == 'cena_asc' %}selected{% endif %}>
+                            Cena: od najlacnejších
+                        </option>
+                        <option value="cena_desc" {% if request.GET.zoradenie == 'cena_desc' %}selected{% endif %}>
+                            Cena: od najdrahších
+                        </option>
+                    </select>
+                </div>
+
+                <div class="col-lg-3 col-md-6 col-12 d-flex align-items-end gap-2">
+                    <button type="submit" class="btn btn-primary w-100 fw-bold py-2">
+                        <i class="bi bi-funnel-fill me-2"></i>Filtrovať
+                    </button>
+                    {% if request.GET.q or request.GET.kategoria or request.GET.l or request.GET.r or request.GET.min_cena or request.GET.max_cena or request.GET.typ or request.GET.zoradenie %}
+                        <a href="{% url 'home' %}" class="btn btn-outline-danger px-4 py-2" title="Zrušiť filtre">
+                            <i class="bi bi-x-lg"></i>
+                        </a>
+                    {% endif %}
+                </div>
+
+            </div>
+
         </form>
     </div>
 </div>
